@@ -603,13 +603,13 @@ export default function App() {
 
   // ── Fuse splash ──
   const [showSplash, setShowSplash] = useState(() => {
-    return !sessionStorage.getItem('fuse_selah_launched_v2');
+    return !localStorage.getItem('fuse_selah_launched');
   });
   useEffect(() => {
     if (showSplash) {
       const t = setTimeout(() => {
         setShowSplash(false);
-        sessionStorage.setItem('fuse_selah_launched_v2', '1');
+        localStorage.setItem('fuse_selah_launched', '1');
       }, 2400);
       return () => clearTimeout(t);
     }
@@ -747,7 +747,7 @@ export default function App() {
             </svg>
           </div>
           <div className="fuse-splash-name">Selah</div>
-          <div className="fuse-splash-by">a fuse app · by TNT Labs</div>
+          <div className="fuse-splash-by">Fuse Apps · by TNT Labs</div>
         </div>
       )}
 
@@ -943,7 +943,7 @@ export default function App() {
               <circle cx="6.5" cy="4.5" r="1.8" stroke="white" strokeWidth="0.9"/>
             </svg>
           </div>
-          <span className="fuse-footer-word">fuse</span>
+          <span className="fuse-footer-word">Fuse Apps</span>
           <span className="fuse-footer-sep">·</span>
           <span className="fuse-footer-by">by TNT Labs</span>
         </div>
