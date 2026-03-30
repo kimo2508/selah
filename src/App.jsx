@@ -70,7 +70,7 @@ async function fetchChart(title, artist) {
       messages: [{
         role: 'user',
         content: `Bass chart for: "${title}" by "${artist || 'unknown'}"
-Return ONLY this JSON:
+Return ONLY this JSON. Sections must have lines — each line is one row of chords as they appear in the song. Include repeat counts where applicable.
 {
   "title": "song title",
   "artist": "artist name",
@@ -78,11 +78,36 @@ Return ONLY this JSON:
   "bpm": 72,
   "timeSignature": "4/4",
   "sections": [
-    {"name": "Intro", "chords": [{"chord": "G", "beats": 4, "function": "I"}]},
-    {"name": "Verse", "chords": [{"chord": "G", "beats": 4, "function": "I"},{"chord": "D", "beats": 4, "function": "V"},{"chord": "Em", "beats": 4, "function": "vi"},{"chord": "C", "beats": 4, "function": "IV"}]},
-    {"name": "Pre-Chorus", "chords": [{"chord": "Em", "beats": 4, "function": "vi"},{"chord": "C", "beats": 4, "function": "IV"}]},
-    {"name": "Chorus", "chords": [{"chord": "G", "beats": 4, "function": "I"},{"chord": "D", "beats": 2, "function": "V"},{"chord": "Em", "beats": 2, "function": "vi"},{"chord": "C", "beats": 4, "function": "IV"}]},
-    {"name": "Bridge", "chords": [{"chord": "C", "beats": 4, "function": "IV"},{"chord": "G", "beats": 4, "function": "I"}]}
+    {
+      "name": "Verse",
+      "repeat": 2,
+      "lines": [
+        [{"chord": "G", "beats": 4, "function": "I"}, {"chord": "C", "beats": 4, "function": "IV"}],
+        [{"chord": "D", "beats": 4, "function": "V"}, {"chord": "G", "beats": 4, "function": "I"}]
+      ]
+    },
+    {
+      "name": "Pre-Chorus",
+      "repeat": 1,
+      "lines": [
+        [{"chord": "Em", "beats": 4, "function": "vi"}, {"chord": "C", "beats": 4, "function": "IV"}]
+      ]
+    },
+    {
+      "name": "Chorus",
+      "repeat": 2,
+      "lines": [
+        [{"chord": "G", "beats": 4, "function": "I"}, {"chord": "D", "beats": 4, "function": "V"}],
+        [{"chord": "Em", "beats": 4, "function": "vi"}, {"chord": "C", "beats": 4, "function": "IV"}]
+      ]
+    },
+    {
+      "name": "Bridge",
+      "repeat": 1,
+      "lines": [
+        [{"chord": "C", "beats": 4, "function": "IV"}, {"chord": "G", "beats": 4, "function": "I"}]
+      ]
+    }
   ],
   "bassTab": {
     "Verse": {"G": "|-3--3-3--3--|","D": "|------------|","A": "|--0--0-0----|","E": "|------------|","description": "Root notes, quarter note feel"},
@@ -204,8 +229,11 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .tab-nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 .tab-content { padding: 13px 14px; animation: fadeIn 0.18s ease; }
 
-.section-block { margin-bottom: 16px; }
+.section-block { margin-bottom: 20px; }
 .section-name { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+.section-repeat { font-size: 10px; color: var(--accent); font-family: var(--mono); margin-left: 6px; }
+.chord-line { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; }
+.chord-line:last-child { margin-bottom: 0; }
 .chord-grid { display: flex; flex-wrap: wrap; gap: 5px; }
 .chord-cell { display: flex; flex-direction: column; align-items: center; min-width: 52px; padding: 8px 7px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); transition: all 0.12s; }
 .chord-cell.playing { background: var(--accent-bg); border-color: var(--accent); }
@@ -408,7 +436,13 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport }) {
   useEffect(() => {
     if (!data) return;
     const flat = [];
-    data.sections?.forEach(sec => sec.chords?.forEach((c, i) => flat.push({ ...c, section: sec.name, idx: i })));
+    data.sections?.forEach(sec => {
+      if (sec.lines) {
+        sec.lines.forEach((line, li) => line.forEach((c, i) => flat.push({ ...c, section: sec.name, lineIdx: li, idx: i })));
+      } else {
+        sec.chords?.forEach((c, i) => flat.push({ ...c, section: sec.name, idx: i }));
+      }
+    });
     allRef.current = flat;
     setBpm(data.bpm || 72);
     setIsPlaying(false);
@@ -457,19 +491,39 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport }) {
       <div className="tab-content">
         {activeTab === 'chart' && data.sections?.map(sec => (
           <div key={sec.name} className="section-block">
-            <div className="section-name">{sec.name}</div>
-            <div className="chord-grid">
-              {sec.chords?.map((c, i) => {
-                const on = isPlaying && cur?.section === sec.name && cur?.idx === i;
-                return (
-                  <div key={i} className={`chord-cell${on ? ' playing' : ''}`}>
-                    <div className="chord-name">{tc(c.chord)}</div>
-                    <div className="chord-beats">{c.beats}b</div>
-                    {c.function && <div className="chord-func">{romanToNashville(c.function)}</div>}
-                  </div>
-                );
-              })}
+            <div className="section-name">
+              {sec.name}
+              {sec.repeat > 1 && <span className="section-repeat">x{sec.repeat}</span>}
             </div>
+            {/* New line-by-line format */}
+            {sec.lines ? sec.lines.map((line, li) => (
+              <div key={li} className="chord-line">
+                {line.map((c, i) => {
+                  const on = isPlaying && cur?.section === sec.name && cur?.lineIdx === li && cur?.idx === i;
+                  return (
+                    <div key={i} className={`chord-cell${on ? ' playing' : ''}`}>
+                      <div className="chord-name">{tc(c.chord)}</div>
+                      <div className="chord-beats">{c.beats}b</div>
+                      {c.function && <div className="chord-func">{romanToNashville(c.function)}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )) : (
+              /* Legacy flat chords format — backwards compatible */
+              <div className="chord-grid">
+                {sec.chords?.map((c, i) => {
+                  const on = isPlaying && cur?.section === sec.name && cur?.idx === i;
+                  return (
+                    <div key={i} className={`chord-cell${on ? ' playing' : ''}`}>
+                      <div className="chord-name">{tc(c.chord)}</div>
+                      <div className="chord-beats">{c.beats}b</div>
+                      {c.function && <div className="chord-func">{romanToNashville(c.function)}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ))}
         {activeTab === 'tab' && (!data.bassTab
@@ -602,16 +656,31 @@ function StageMode({ setlistName, songs, onExit }) {
                     </div>
                     {sTab === 'chart' && song.data.sections?.map(sec => (
                       <div key={sec.name} className="section-block">
-                        <div className="section-name">{sec.name}</div>
-                        <div className="chord-grid">
-                          {sec.chords?.map((c, i) => (
-                            <div key={i} className="chord-cell">
-                              <div className="chord-name">{tc(c.chord, si)}</div>
-                              <div className="chord-beats">{c.beats}b</div>
-                              {c.function && <div className="chord-func">{romanToNashville(c.function)}</div>}
-                            </div>
-                          ))}
+                        <div className="section-name">
+                          {sec.name}
+                          {sec.repeat > 1 && <span className="section-repeat">x{sec.repeat}</span>}
                         </div>
+                        {sec.lines ? sec.lines.map((line, li) => (
+                          <div key={li} className="chord-line">
+                            {line.map((c, i) => (
+                              <div key={i} className="chord-cell">
+                                <div className="chord-name">{tc(c.chord, si)}</div>
+                                <div className="chord-beats">{c.beats}b</div>
+                                {c.function && <div className="chord-func">{romanToNashville(c.function)}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        )) : (
+                          <div className="chord-grid">
+                            {sec.chords?.map((c, i) => (
+                              <div key={i} className="chord-cell">
+                                <div className="chord-name">{tc(c.chord, si)}</div>
+                                <div className="chord-beats">{c.beats}b</div>
+                                {c.function && <div className="chord-func">{romanToNashville(c.function)}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                     {sTab === 'tab' && (!song.data.bassTab ? <div style={{ color:'var(--text3)', fontSize:14 }}>No tab available.</div> : Object.entries(song.data.bassTab).map(([sn, d]) => (
