@@ -999,9 +999,73 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('bass-setlists') || '[]'); } catch { return []; }
   });
   const [stageOpen, setStageOpen] = useState(false);
+  // ── Touch drag reorder ──────────────────────────────────────────────────────
   const dragIdx = useRef(null);
   const dragOverIdx = useRef(null);
+  const [draggingIdx, setDraggingIdx] = useState(null);
+  const [dragOverVisual, setDragOverVisual] = useState(null);
+  const listRef = useRef(null);
 
+  // Desktop drag
+  function onDragStart(i) { dragIdx.current = i; setDraggingIdx(i); }
+  function onDragOver(e, i) { e.preventDefault(); dragOverIdx.current = i; setDragOverVisual(i); }
+  function onDragEnd() { setDraggingIdx(null); setDragOverVisual(null); }
+  function onDrop(i) {
+    if (dragIdx.current === null || dragIdx.current === i) { dragIdx.current = null; return; }
+    setSetlistSongs(p => {
+      const arr = [...p]; const [moved] = arr.splice(dragIdx.current, 1); arr.splice(i, 0, moved); return arr;
+    });
+    dragIdx.current = null; dragOverIdx.current = null;
+    setDraggingIdx(null); setDragOverVisual(null);
+  }
+
+  // Mobile touch drag
+  const touchDragIdx = useRef(null);
+  const touchStartY = useRef(0);
+  const [touchDragActive, setTouchDragActive] = useState(false);
+  const [touchDragY, setTouchDragY] = useState(0);
+  const [touchOverIdx, setTouchOverIdx] = useState(null);
+
+  function onTouchHandleStart(e, i) {
+    e.preventDefault();
+    touchDragIdx.current = i;
+    touchStartY.current = e.touches[0].clientY;
+    setTouchDragActive(true);
+    setTouchDragY(e.touches[0].clientY);
+    setTouchOverIdx(i);
+  }
+
+  function onTouchHandleMove(e) {
+    if (touchDragIdx.current === null) return;
+    e.preventDefault();
+    const y = e.touches[0].clientY;
+    setTouchDragY(y);
+    // Find which item we're hovering over
+    if (listRef.current) {
+      const items = listRef.current.querySelectorAll('[data-setlist-idx]');
+      for (const item of items) {
+        const rect = item.getBoundingClientRect();
+        if (y >= rect.top && y <= rect.bottom) {
+          const idx = parseInt(item.dataset.setlistIdx);
+          setTouchOverIdx(idx);
+          break;
+        }
+      }
+    }
+  }
+
+  function onTouchHandleEnd() {
+    if (touchDragIdx.current !== null && touchOverIdx !== null && touchDragIdx.current !== touchOverIdx) {
+      const from = touchDragIdx.current;
+      const to = touchOverIdx;
+      setSetlistSongs(p => {
+        const arr = [...p]; const [moved] = arr.splice(from, 1); arr.splice(to, 0, moved); return arr;
+      });
+    }
+    touchDragIdx.current = null;
+    setTouchDragActive(false);
+    setTouchOverIdx(null);
+  }
   useEffect(() => { try { localStorage.setItem('bass-library', JSON.stringify(library)); } catch {} }, [library]);
   useEffect(() => { try { localStorage.setItem('bass-setlists', JSON.stringify(savedSetlists)); } catch {} }, [savedSetlists]);
 
@@ -1309,23 +1373,58 @@ export default function App() {
             {setlistSongs.length === 0 ? (
               <div className="setlist-empty"><div style={{ fontSize:26, marginBottom:8 }}>📋</div>Add songs manually above, from your Library,<br />or import from the Services tab.</div>
             ) : (
-              <div className="setlist-items">
-                {setlistSongs.map((song, i) => (
-                  <div key={i} data-setlist-idx={i} className={`setlist-item ${song.status}`} draggable onDragStart={() => onDragStart(i)} onDragOver={e=>onDragOver(e,i)} onDrop={onDrop}>
-                    <div className="item-drag-handle">☰</div>
-                    <div className="item-num">{i+1}</div>
-                    <div className="item-info">
-                      <div className="item-title">{song.title}</div>
-                      <div className="item-sub">{song.artist || '—'}{song.data ? ` · ${song.data.key} · ♩${song.data.bpm}` : song.pcoKey ? ` · Key: ${song.pcoKey} (PCO)` : ''}</div>
-                      {song.status === 'error' && <div style={{ fontSize:11, color:'var(--red)', marginTop:1 }}>Load failed</div>}
+              <div className="setlist-items" ref={listRef} onTouchMove={onTouchHandleMove} onTouchEnd={onTouchHandleEnd}>
+                {setlistSongs.map((song, i) => {
+                  const isDragging = draggingIdx === i || touchDragIdx.current === i;
+                  const isOver = dragOverVisual === i || touchOverIdx === i;
+                  return (
+                    <div
+                      key={i}
+                      data-setlist-idx={i}
+                      className={`setlist-item ${song.status}`}
+                      draggable
+                      onDragStart={() => onDragStart(i)}
+                      onDragOver={e => onDragOver(e, i)}
+                      onDragEnd={onDragEnd}
+                      onDrop={() => onDrop(i)}
+                      style={{
+                        opacity: isDragging ? 0.4 : 1,
+                        borderColor: isOver && !isDragging ? 'var(--accent)' : undefined,
+                        transform: isOver && !isDragging ? 'scale(1.01)' : 'scale(1)',
+                        transition: 'opacity 0.15s, transform 0.15s, border-color 0.15s',
+                      }}
+                    >
+                      <div
+                        className="item-drag-handle"
+                        onTouchStart={e => onTouchHandleStart(e, i)}
+                        style={{ cursor: touchDragActive ? 'grabbing' : 'grab' }}
+                      >☰</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:1, flexShrink:0 }}>
+                        <button
+                          onClick={() => { if (i === 0) return; setSetlistSongs(p => { const a=[...p]; [a[i-1],a[i]]=[a[i],a[i-1]]; return a; }); }}
+                          disabled={i === 0}
+                          style={{ background:'none', border:'none', color:'var(--text3)', fontSize:10, cursor:'pointer', padding:'1px 3px', lineHeight:1, opacity: i===0?0.2:1 }}
+                        >▲</button>
+                        <button
+                          onClick={() => { if (i === setlistSongs.length-1) return; setSetlistSongs(p => { const a=[...p]; [a[i],a[i+1]]=[a[i+1],a[i]]; return a; }); }}
+                          disabled={i === setlistSongs.length - 1}
+                          style={{ background:'none', border:'none', color:'var(--text3)', fontSize:10, cursor:'pointer', padding:'1px 3px', lineHeight:1, opacity: i===setlistSongs.length-1?0.2:1 }}
+                        >▼</button>
+                      </div>
+                      <div className="item-num">{i+1}</div>
+                      <div className="item-info">
+                        <div className="item-title">{song.title}</div>
+                        <div className="item-sub">{song.artist || '—'}{song.data ? ` · ${song.data.key} · ♩${song.data.bpm}` : song.pcoKey ? ` · Key: ${song.pcoKey} (PCO)` : ''}</div>
+                        {song.status === 'error' && <div style={{ fontSize:11, color:'var(--red)', marginTop:1 }}>Load failed</div>}
+                      </div>
+                      <div className={`status-dot ${song.status==='loaded'?'loaded':song.status==='loading'?'loading':song.status==='error'?'error':'pending'}`} />
+                      {(song.status === 'pending' || song.status === 'error') && (
+                        <button className="item-load-btn" onClick={() => loadSongAt(i)}>{song.status==='error'?'Retry':'Load'}</button>
+                      )}
+                      <button className="item-del" onClick={() => removeSong(i)}>×</button>
                     </div>
-                    <div className={`status-dot ${song.status==='loaded'?'loaded':song.status==='loading'?'loading':song.status==='error'?'error':'pending'}`} />
-                    {(song.status === 'pending' || song.status === 'error') && (
-                      <button className="item-load-btn" onClick={() => loadSongAt(i)}>{song.status==='error'?'Retry':'Load'}</button>
-                    )}
-                    <button className="item-del" onClick={() => removeSong(i)}>×</button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             {setlistSongs.length > 0 && (
