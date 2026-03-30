@@ -987,10 +987,14 @@ export default function App() {
   });
 
   // Setlist
-  const [setlistName, setSetlistName] = useState('Sunday Service');
+  const [setlistName, setSetlistName] = useState(() => {
+    try { return localStorage.getItem('bass-active-setlist-name') || 'Sunday Service'; } catch { return 'Sunday Service'; }
+  });
   const [addTitle, setAddTitle] = useState('');
   const [addArtist, setAddArtist] = useState('');
-  const [setlistSongs, setSetlistSongs] = useState([]);
+  const [setlistSongs, setSetlistSongs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('bass-active-setlist') || '[]'); } catch { return []; }
+  });
   const [savedSetlists, setSavedSetlists] = useState(() => {
     try { return JSON.parse(localStorage.getItem('bass-setlists') || '[]'); } catch { return []; }
   });
@@ -1000,6 +1004,14 @@ export default function App() {
 
   useEffect(() => { try { localStorage.setItem('bass-library', JSON.stringify(library)); } catch {} }, [library]);
   useEffect(() => { try { localStorage.setItem('bass-setlists', JSON.stringify(savedSetlists)); } catch {} }, [savedSetlists]);
+
+  // Persist active setlist — saves full chart data so reopening the app restores everything instantly
+  useEffect(() => {
+    try { localStorage.setItem('bass-active-setlist', JSON.stringify(setlistSongs)); } catch {}
+  }, [setlistSongs]);
+  useEffect(() => {
+    try { localStorage.setItem('bass-active-setlist-name', setlistName); } catch {}
+  }, [setlistName]);
 
   const isInLibrary = songData ? library.some(s => s.title === songData.title && s.artist === songData.artist) : false;
 
@@ -1085,11 +1097,50 @@ export default function App() {
 
   function saveSetlist() {
     if (!setlistSongs.length) return;
-    const sl = { id: Date.now(), name: setlistName, date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}), songs: setlistSongs.map(s=>({title:s.title,artist:s.artist,status:'pending',data:null})) };
-    setSavedSetlists(p => [sl, ...p]);
+    // Check if a setlist with this name already exists — update it instead of duplicating
+    const existing = savedSetlists.findIndex(s => s.name === setlistName);
+    const sl = {
+      id: existing >= 0 ? savedSetlists[existing].id : Date.now(),
+      name: setlistName,
+      date: new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }),
+      songs: setlistSongs.map(s => ({
+        title: s.title,
+        artist: s.artist,
+        pcoKey: s.pcoKey || '',
+        // Save full chart data so reloading is instant
+        status: s.status === 'loaded' ? 'loaded' : 'pending',
+        data: s.data || null,
+      })),
+    };
+    if (existing >= 0) {
+      setSavedSetlists(p => { const n=[...p]; n[existing]=sl; return n; });
+    } else {
+      setSavedSetlists(p => [sl, ...p]);
+    }
   }
 
-  function loadSaved(sl) { setSetlistName(sl.name); setSetlistSongs(sl.songs.map(s=>({...s,status:'pending',data:null}))); }
+  function loadSaved(sl) {
+    setSetlistName(sl.name);
+    // Restore with full data — songs that were loaded come back loaded instantly
+    setSetlistSongs(sl.songs.map(s => ({
+      ...s,
+      status: s.data ? 'loaded' : 'pending',
+    })));
+    setView('setlist');
+  }
+
+  function newSetlist() {
+    // Suggest a name based on the next Sunday date
+    const today = new Date();
+    const day = today.getDay();
+    const daysUntilSunday = day === 0 ? 7 : 7 - day;
+    const nextSunday = new Date(today);
+    nextSunday.setDate(today.getDate() + daysUntilSunday);
+    const suggested = nextSunday.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ' Sunday';
+    setSetlistName(suggested);
+    setSetlistSongs([]);
+    setView('setlist');
+  }
 
   function onDragStart(i) { dragIdx.current = i; }
   function onDragOver(e, i) { e.preventDefault(); dragOverIdx.current = i; }
@@ -1243,7 +1294,10 @@ export default function App() {
         {/* ── SETLIST ── */}
         {view === 'setlist' && (
           <div className="setlist-view">
-            <input className="setlist-name-input" value={setlistName} onChange={e=>setSetlistName(e.target.value)} placeholder="Setlist name" />
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+              <input className="setlist-name-input" style={{ marginBottom:0, flex:1 }} value={setlistName} onChange={e=>setSetlistName(e.target.value)} placeholder="Setlist name e.g. Apr 6 Sunday" />
+              <button className="btn-ghost" style={{ fontSize:12, padding:'7px 10px', flexShrink:0 }} onClick={newSetlist}>+ New</button>
+            </div>
             <div className="add-song-area">
               <div className="add-area-label">Add song manually</div>
               <div className="add-song-row">
@@ -1285,19 +1339,31 @@ export default function App() {
                   </button>
                 </div>
                 <div style={{ marginTop:8 }}>
-                  <button className="btn-ghost" style={{ width:'100%' }} onClick={saveSetlist}>Save setlist</button>
+                  <button className="btn-ghost" style={{ width:'100%' }} onClick={() => { saveSetlist(); }}>
+                    {savedSetlists.some(s => s.name === setlistName) ? `↑ Update "${setlistName}"` : `Save as "${setlistName}"`}
+                  </button>
                 </div>
               </>
             )}
             {savedSetlists.length > 0 && (
               <div className="saved-setlists">
-                <div className="saved-label">Saved setlists</div>
-                {savedSetlists.map(sl => (
-                  <div key={sl.id} className="saved-item" onClick={() => loadSaved(sl)}>
-                    <div className="saved-item-info"><div className="saved-item-name">{sl.name}</div><div className="saved-item-meta">{sl.songs.length} songs · {sl.date}</div></div>
-                    <button className="saved-item-del" onClick={e=>{ e.stopPropagation(); setSavedSetlists(p=>p.filter(x=>x.id!==sl.id)); }}>×</button>
-                  </div>
-                ))}
+                <div className="saved-label">Saved setlists ({savedSetlists.length})</div>
+                {savedSetlists.map(sl => {
+                  const loadedSongs = sl.songs.filter(s => s.data).length;
+                  return (
+                    <div key={sl.id} className="saved-item" onClick={() => loadSaved(sl)}>
+                      <div className="saved-item-info">
+                        <div className="saved-item-name">{sl.name}</div>
+                        <div className="saved-item-meta">
+                          {sl.songs.length} songs
+                          {loadedSongs > 0 && <span style={{ color:'var(--green)', marginLeft:6 }}>· {loadedSongs} charts ready</span>}
+                          {' · '}{sl.date}
+                        </div>
+                      </div>
+                      <button className="saved-item-del" onClick={e=>{ e.stopPropagation(); setSavedSetlists(p=>p.filter(x=>x.id!==sl.id)); }}>×</button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
