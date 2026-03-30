@@ -51,9 +51,14 @@ export default async function handler(req, res) {
 
     // ── Get my scheduled plans (services I'm playing on) ──────────────────
     if (action === 'myPlans') {
-      // Get plans where I'm scheduled
+      // First get my person ID
+      const me = await pcoFetch('/services/v2/me');
+      const personId = me?.data?.id;
+      if (!personId) throw new Error('Could not get person ID');
+
+      // Get plan people where I am scheduled, include plan and service type
       const data = await pcoFetch(
-        `/services/v2/me/plans?filter=future&order=sort_date&per_page=20&include=service_type`
+        `/services/v2/people/${personId}/plan_people?filter=future&order=sort_date&per_page=20&include=plan,service_type`
       );
       return res.status(200).json(data);
     }
