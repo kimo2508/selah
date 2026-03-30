@@ -29,6 +29,7 @@ function transposeKey(k, st) {
   return transposeNote(r[1], st) + (minor ? ' minor' : '');
 }
 
+// ── Nashville Number System ──────────────────────────────────────────────────
 function romanToNashville(func) {
   if (!func) return '';
   const map = {
@@ -45,6 +46,7 @@ function romanToNashville(func) {
   return num + minSuffix + quality.replace(/^m(?!aj|in)/i, '');
 }
 
+// ── Quick suggests ───────────────────────────────────────────────────────────
 const SUGGESTIONS = [
   { title: 'Way Maker', artist: 'Sinach' },
   { title: 'Goodness of God', artist: 'Bethel Music' },
@@ -56,6 +58,7 @@ const SUGGESTIONS = [
   { title: 'Reckless Love', artist: 'Cory Asbury' },
 ];
 
+// ── AI chart fetch ───────────────────────────────────────────────────────────
 async function fetchChart(title, artist) {
   const resp = await fetch('/api/chat', {
     method: 'POST',
@@ -100,6 +103,22 @@ Return ONLY this JSON:
   return JSON.parse(text.replace(/```json|```/g, '').trim());
 }
 
+// ── Planning Center API calls ────────────────────────────────────────────────
+async function pcoGet(action, params = {}) {
+  const query = new URLSearchParams({ action, ...params }).toString();
+  const resp = await fetch(`/api/planning-center?${query}`);
+  if (!resp.ok) throw new Error(`PCO error ${resp.status}`);
+  return resp.json();
+}
+
+// ── Format date nicely ───────────────────────────────────────────────────────
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ── CSS ──────────────────────────────────────────────────────────────────────
 const styles = `
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -109,6 +128,7 @@ const styles = `
   --accent: #e8c170; --accent-bg: rgba(232,193,112,0.12);
   --blue: #5b9cf6; --blue-bg: rgba(91,156,246,0.12);
   --green: #6bcb8b; --green-bg: rgba(107,203,139,0.12);
+  --purple: #b59cf6; --purple-bg: rgba(181,156,246,0.12);
   --red: #f07070;
   --radius: 10px; --radius-sm: 6px;
   --font: 'Sora', sans-serif; --mono: 'Space Mono', monospace;
@@ -117,12 +137,13 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .app { min-height: 100dvh; max-width: 640px; margin: 0 auto; padding: 0 0 90px; }
 
 .nav-bar { position: sticky; top: 0; z-index: 50; background: rgba(15,15,15,0.95); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); padding: 0 12px; display: flex; align-items: center; }
-.nav-logo { display: flex; align-items: center; gap: 8px; padding: 11px 0; margin-right: 8px; }
-.logo-icon { width: 28px; height: 28px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.logo-icon svg { width: 15px; height: 15px; fill: #0f0f0f; }
-.nav-title { font-size: 14px; font-weight: 700; letter-spacing: -0.3px; }
-.nav-tabs { display: flex; flex: 1; }
-.nav-tab { flex: 1; padding: 13px 2px; font-size: 11px; font-weight: 500; text-align: center; color: var(--text3); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-family: var(--font); transition: color 0.15s, border-color 0.15s; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
+.nav-logo { display: flex; align-items: center; gap: 7px; padding: 11px 0; margin-right: 8px; flex-shrink: 0; }
+.logo-icon { width: 27px; height: 27px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.logo-icon svg { width: 14px; height: 14px; fill: #0f0f0f; }
+.nav-title { font-size: 13px; font-weight: 700; letter-spacing: -0.3px; }
+.nav-tabs { display: flex; flex: 1; overflow-x: auto; scrollbar-width: none; }
+.nav-tabs::-webkit-scrollbar { display: none; }
+.nav-tab { flex-shrink: 0; padding: 13px 8px; font-size: 11px; font-weight: 500; text-align: center; color: var(--text3); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-family: var(--font); transition: color 0.15s, border-color 0.15s; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
 .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
 .search-section { padding: 13px 16px 0; }
@@ -147,7 +168,7 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-text { font-size: 14px; color: var(--text2); }
 .loading-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
-.error-card { margin: 10px 16px 0; background: rgba(240,112,112,0.1); border: 1px solid rgba(240,112,112,0.3); border-radius: var(--radius); padding: 12px 14px; font-size: 14px; color: var(--red); }
+.error-card { margin: 10px 16px 0; background: rgba(240,112,112,0.1); border: 1px solid rgba(240,112,112,0.3); border-radius: var(--radius); padding: 12px 14px; font-size: 14px; color: var(--red); line-height: 1.5; }
 .empty-state { padding: 44px 16px; text-align: center; }
 .empty-icon { font-size: 32px; margin-bottom: 10px; }
 .empty-title { font-size: 15px; font-weight: 500; color: var(--text2); }
@@ -156,8 +177,6 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .song-card { margin: 10px 16px 0; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; animation: slideUp 0.22s ease; }
 @keyframes slideUp { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-@keyframes fusePop { from { opacity:0; transform: scale(0.5); } to { opacity:1; transform: scale(1); } }
-@keyframes fuseUp { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
 .song-card-header { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .song-title { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
 .song-artist { font-size: 12px; color: var(--text2); margin-top: 2px; }
@@ -170,6 +189,7 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .pill-key { background: var(--accent-bg); color: var(--accent); }
 .pill-bpm { background: var(--blue-bg); color: var(--blue); }
 .pill-time { background: var(--green-bg); color: var(--green); }
+.pill-pco { background: var(--purple-bg); color: var(--purple); }
 
 .transposer { padding: 8px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 9px; }
 .transposer-label { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); }
@@ -222,6 +242,7 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .bpm-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%; background: var(--accent); cursor: pointer; border: none; }
 .playhead-display { font-family: var(--mono); font-size: 10px; color: var(--text3); text-align: right; flex-shrink: 0; min-width: 56px; }
 
+/* ── Library ── */
 .library-view { padding: 14px 16px; }
 .library-label { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); margin-bottom: 10px; }
 .library-empty { text-align: center; padding: 40px 0; color: var(--text3); font-size: 14px; line-height: 1.6; }
@@ -234,8 +255,8 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .library-item-actions { display: flex; gap: 5px; flex-shrink: 0; }
 .lib-btn { padding: 5px 10px; font-size: 11px; font-weight: 500; font-family: var(--font); border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg3); color: var(--text2); cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
 .lib-btn:active { border-color: var(--accent); color: var(--accent); }
-.lib-btn.danger:active { border-color: var(--red); color: var(--red); }
 
+/* ── Setlist ── */
 .setlist-view { padding: 14px 16px; }
 .setlist-name-input { font-size: 17px; font-weight: 600; color: var(--text); background: none; border: none; border-bottom: 1px solid var(--border); outline: none; font-family: var(--font); padding: 2px 0; width: 100%; margin-bottom: 14px; transition: border-color 0.15s; }
 .setlist-name-input:focus { border-bottom-color: var(--accent); }
@@ -252,7 +273,6 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .setlist-item.loading { border-left-color: var(--accent); }
 .setlist-item.error { border-left-color: var(--red); }
 .item-drag-handle { color: var(--text3); font-size: 16px; cursor: grab; padding: 0 2px; flex-shrink: 0; touch-action: none; user-select: none; }
-.item-drag-handle:active { cursor: grabbing; }
 .item-num { font-family: var(--mono); font-size: 11px; color: var(--text3); width: 14px; flex-shrink: 0; }
 .item-info { flex: 1; min-width: 0; }
 .item-title { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -269,7 +289,7 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .stage-btn { flex: 1; padding: 13px 18px; background: var(--accent); color: #0f0f0f; font-family: var(--font); font-size: 15px; font-weight: 700; border: none; border-radius: var(--radius); cursor: pointer; transition: opacity 0.15s, transform 0.1s; -webkit-tap-highlight-color: transparent; }
 .stage-btn:active { transform: scale(0.97); }
 .stage-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
-.load-all-btn { padding: 13px 12px; background: var(--bg3); color: var(--text2); font-family: var(--font); font-size: 13px; font-weight: 500; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
+.load-all-btn { padding: 13px 12px; background: var(--bg3); color: var(--text2); font-family: var(--font); font-size: 13px; font-weight: 500; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .load-all-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .saved-setlists { margin-top: 20px; }
 .saved-label { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
@@ -280,6 +300,64 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .saved-item-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
 .saved-item-del { color: var(--text3); font-size: 18px; padding: 2px 6px; border: none; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
+/* ── Planning Center / Services tab ── */
+.pco-view { padding: 14px 16px; }
+.pco-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.pco-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.pco-subtitle { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.sync-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--purple-bg); color: var(--purple); font-family: var(--font); font-size: 13px; font-weight: 600; border: 1px solid var(--purple); border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
+.sync-btn:active { opacity: 0.8; }
+.sync-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.sync-icon { font-size: 14px; }
+.sync-icon.spinning { animation: spin 1s linear infinite; display: inline-block; }
+
+.pco-section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; margin-top: 16px; }
+.pco-section-label:first-of-type { margin-top: 0; }
+
+.service-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; -webkit-tap-highlight-color: transparent; }
+.service-card:active { border-color: var(--accent); }
+.service-card.expanded { border-color: var(--purple); }
+.service-card-header { padding: 13px 14px; display: flex; align-items: center; gap: 12px; }
+.service-date-badge { background: var(--purple-bg); color: var(--purple); border-radius: var(--radius-sm); padding: 6px 10px; text-align: center; flex-shrink: 0; }
+.service-date-day { font-family: var(--mono); font-size: 18px; font-weight: 700; line-height: 1; }
+.service-date-month { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+.service-info { flex: 1; min-width: 0; }
+.service-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.service-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.service-chevron { color: var(--text3); font-size: 12px; flex-shrink: 0; transition: transform 0.2s; }
+.service-card.expanded .service-chevron { transform: rotate(90deg); }
+.scheduled-badge { font-size: 10px; font-weight: 600; background: var(--green-bg); color: var(--green); padding: 2px 7px; border-radius: 99px; margin-top: 3px; display: inline-block; }
+
+.service-songs { border-top: 1px solid var(--border); padding: 12px 14px; animation: fadeIn 0.18s ease; }
+.service-songs-label { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+
+.pco-song-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.pco-song-row:last-child { border-bottom: none; }
+.pco-song-num { font-family: var(--mono); font-size: 11px; color: var(--text3); width: 16px; flex-shrink: 0; }
+.pco-song-info { flex: 1; min-width: 0; }
+.pco-song-title { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pco-song-meta { font-size: 11px; color: var(--text3); margin-top: 1px; font-family: var(--mono); }
+.pco-song-actions { display: flex; gap: 5px; flex-shrink: 0; }
+.pco-btn { padding: 5px 10px; font-size: 11px; font-weight: 500; font-family: var(--font); border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg3); color: var(--text2); cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap; transition: all 0.12s; }
+.pco-btn:active { border-color: var(--accent); color: var(--accent); }
+.pco-btn.pdf { border-color: rgba(181,156,246,0.4); color: var(--purple); background: var(--purple-bg); }
+.pco-btn.pdf:active { opacity: 0.7; }
+
+.import-all-btn { width: 100%; padding: 11px; background: var(--purple-bg); color: var(--purple); font-family: var(--font); font-size: 13px; font-weight: 600; border: 1px solid var(--purple); border-radius: var(--radius-sm); cursor: pointer; margin-top: 10px; -webkit-tap-highlight-color: transparent; transition: opacity 0.15s; }
+.import-all-btn:active { opacity: 0.75; }
+
+/* PDF viewer overlay */
+.pdf-overlay { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; max-width: 640px; margin: 0 auto; }
+.pdf-topbar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.pdf-song-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.pdf-song-artist { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.pdf-close { padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: none; color: var(--text2); font-size: 12px; font-family: var(--font); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.pdf-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
+.pdf-frame { width: 100%; height: 100%; border: none; border-radius: var(--radius-sm); background: white; }
+.pdf-loading { text-align: center; color: var(--text2); font-size: 14px; }
+.pdf-open-btn { margin-top: 14px; padding: 11px 20px; background: var(--purple); color: #0f0f0f; font-family: var(--font); font-size: 14px; font-weight: 600; border: none; border-radius: var(--radius-sm); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+/* ── Stage mode ── */
 .stage-overlay { position: fixed; inset: 0; z-index: 200; background: var(--bg); display: flex; flex-direction: column; max-width: 640px; margin: 0 auto; }
 .stage-topbar { background: rgba(15,15,15,0.96); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 .stage-setlist-name { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); }
@@ -313,19 +391,9 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .stage-cur { text-align: center; flex: 0; min-width: 0; }
 .stage-cur-title { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
 .stage-cur-key { font-family: var(--mono); font-size: 11px; color: var(--accent); margin-top: 1px; }
-
-/* ── Fuse branding ── */
-.fuse-splash { position: fixed; inset: 0; z-index: 9999; background: #0C0B0A; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
-.fuse-splash-icon { width: 64px; height: 64px; background: #E8503C; border-radius: 18px; display: flex; align-items: center; justify-content: center; animation: fusePop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.3s both; }
-.fuse-splash-name { font-family: 'Sora', sans-serif; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; color: #fff; animation: fuseUp 0.4s ease 0.7s both; }
-.fuse-splash-by { font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.14em; text-transform: uppercase; animation: fuseUp 0.4s ease 0.9s both; }
-.fuse-footer { border-top: 1px solid rgba(255,255,255,0.06); padding: 10px 16px; display: flex; align-items: center; justify-content: center; gap: 6px; }
-.fuse-footer-icon { width: 15px; height: 15px; background: #0C0B0A; border: 1px solid #333; border-radius: 3px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.fuse-footer-word { font-family: 'Sora', sans-serif; font-size: 10px; font-weight: 700; color: #555; letter-spacing: 0.08em; }
-.fuse-footer-sep { font-size: 10px; color: #333; }
-.fuse-footer-by { font-size: 10px; color: #555; }
 `;
 
+// ── ChartContent component ───────────────────────────────────────────────────
 function ChartContent({ data, transpose, onTransposeChange, showTransport }) {
   const [activeTab, setActiveTab] = useState('chart');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -364,7 +432,8 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport }) {
         <span className="pill pill-key">Key: {tKey}</span>
         <span className="pill pill-bpm">♩ {bpm}</span>
         <span className="pill pill-time">{data.timeSignature || '4/4'}</span>
-        {transpose !== 0 && <span className="pill" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text2)' }}>{transpose > 0 ? `+${transpose}` : transpose} st</span>}
+        {data.fromPCO && <span className="pill pill-pco">Planning Center</span>}
+        {transpose !== 0 && <span className="pill" style={{ background:'rgba(255,255,255,0.06)', color:'var(--text2)' }}>{transpose > 0 ? `+${transpose}` : transpose} st</span>}
       </div>
       <div className="transposer">
         <span className="transposer-label">Transpose</span>
@@ -400,23 +469,22 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport }) {
             </div>
           </div>
         ))}
-        {activeTab === 'tab' && (
-          !data.bassTab
-            ? <div style={{ color: 'var(--text3)', fontSize: 14 }}>No tab available.</div>
-            : Object.entries(data.bassTab).map(([sn, d]) => (
-              <div key={sn} className="tab-section-block">
-                <div className="tab-section-name">{sn}</div>
-                <div className="tab-staff">
-                  {['G','D','A','E'].map(s => (
-                    <div key={s} className="tab-row">
-                      <span className="string-label">{s}</span>
-                      <span className="string-notes">{d[s] || '|------------|'}</span>
-                    </div>
-                  ))}
-                  {d.description && <div className="tab-desc">{d.description}</div>}
-                </div>
+        {activeTab === 'tab' && (!data.bassTab
+          ? <div style={{ color:'var(--text3)', fontSize:14 }}>No tab available.</div>
+          : Object.entries(data.bassTab).map(([sn, d]) => (
+            <div key={sn} className="tab-section-block">
+              <div className="tab-section-name">{sn}</div>
+              <div className="tab-staff">
+                {['G','D','A','E'].map(s => (
+                  <div key={s} className="tab-row">
+                    <span className="string-label">{s}</span>
+                    <span className="string-notes">{d[s] || '|------------|'}</span>
+                  </div>
+                ))}
+                {d.description && <div className="tab-desc">{d.description}</div>}
               </div>
-            ))
+            </div>
+          ))
         )}
         {activeTab === 'notes' && data.bassNotes && (
           <>
@@ -440,7 +508,7 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport }) {
           </div>
           {isPlaying && cur && (
             <div className="playhead-display">
-              <div style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 14 }}>{tc(cur.chord)}</div>
+              <div style={{ color:'var(--accent)', fontWeight:700, fontSize:14 }}>{tc(cur.chord)}</div>
               <div>{cur.section}</div>
             </div>
           )}
@@ -450,6 +518,7 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport }) {
   );
 }
 
+// ── Stage Mode ───────────────────────────────────────────────────────────────
 function StageMode({ setlistName, songs, onExit }) {
   const [idx, setIdx] = useState(0);
   const [tps, setTps] = useState(() => songs.map(() => 0));
@@ -477,7 +546,6 @@ function StageMode({ setlistName, songs, onExit }) {
     transform: `translateX(calc(${-idx * 100}% + ${dragX}px))`,
     transition: isDragging.current ? 'none' : 'transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94)',
   };
-
   const tc = (chord, si) => transposeChord(chord, tps[si] || 0);
 
   return (
@@ -579,8 +647,307 @@ function StageMode({ setlistName, songs, onExit }) {
   );
 }
 
+// ── PDF Viewer overlay ───────────────────────────────────────────────────────
+function PDFViewer({ song, url, onClose }) {
+  return (
+    <div className="pdf-overlay">
+      <div className="pdf-topbar">
+        <div>
+          <div className="pdf-song-title">{song.title}</div>
+          <div className="pdf-song-artist">{song.artist}</div>
+        </div>
+        <button className="pdf-close" onClick={onClose}>✕ Close</button>
+      </div>
+      <div className="pdf-body">
+        {url ? (
+          <>
+            <iframe className="pdf-frame" src={url} title={song.title} />
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <button className="pdf-open-btn">Open in browser ↗</button>
+            </a>
+          </>
+        ) : (
+          <div className="pdf-loading">
+            <div className="loading-spinner" style={{ margin:'0 auto 12px' }} />
+            Loading chord chart…
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Planning Center Services view ────────────────────────────────────────────
+function ServicesView({ onAddToSetlist }) {
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState('');
+  const [myPlans, setMyPlans] = useState([]);
+  const [expandedPlan, setExpandedPlan] = useState(null);
+  const [planSongs, setPlanSongs] = useState({}); // keyed by planId
+  const [loadingSongs, setLoadingSongs] = useState({});
+  const [pdfViewer, setPdfViewer] = useState(null); // { song, url }
+  const [loadingPdf, setLoadingPdf] = useState({});
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  async function syncPlans() {
+    setSyncing(true);
+    setError('');
+    try {
+      const data = await pcoGet('myPlans');
+      const plans = data.data || [];
+      // Enrich with service type name from included
+      const included = data.included || [];
+      const enriched = plans.map(plan => {
+        const stRel = plan.relationships?.service_type?.data;
+        const st = stRel ? included.find(i => i.type === 'ServiceType' && i.id === stRel.id) : null;
+        return {
+          id: plan.id,
+          serviceTypeId: stRel?.id,
+          serviceName: st?.attributes?.name || 'Service',
+          date: plan.attributes?.sort_date,
+          title: plan.attributes?.title || '',
+          totalLength: plan.attributes?.total_length,
+        };
+      });
+      setMyPlans(enriched);
+      setHasLoaded(true);
+    } catch (e) {
+      setError('Could not connect to Planning Center. Check your API credentials in Vercel.');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function loadPlanSongs(plan) {
+    const key = plan.id;
+    if (planSongs[key] || loadingSongs[key]) return;
+    setLoadingSongs(p => ({ ...p, [key]: true }));
+    try {
+      const data = await pcoGet('planItems', { serviceTypeId: plan.serviceTypeId, planId: plan.id });
+      const items = (data.data || []).filter(i => i.attributes?.item_type === 'song');
+      const included = data.included || [];
+      const songs = items.map((item, idx) => {
+        const songRel = item.relationships?.song?.data;
+        const arrRel = item.relationships?.arrangement?.data;
+        const keyRel = item.relationships?.key?.data;
+        const song = songRel ? included.find(i => i.type === 'Song' && i.id === songRel.id) : null;
+        const arr = arrRel ? included.find(i => i.type === 'Arrangement' && i.id === arrRel.id) : null;
+        const keyObj = keyRel ? included.find(i => i.type === 'Key' && i.id === keyRel.id) : null;
+        return {
+          itemId: item.id,
+          songId: songRel?.id,
+          arrangementId: arrRel?.id,
+          title: song?.attributes?.title || item.attributes?.title || `Song ${idx + 1}`,
+          artist: song?.attributes?.author || '',
+          key: keyObj?.attributes?.name || item.attributes?.key_name || '',
+          bpm: arr?.attributes?.bpm || '',
+          sequence: item.attributes?.sequence || idx,
+          serviceTypeId: plan.serviceTypeId,
+          planId: plan.id,
+        };
+      });
+      songs.sort((a, b) => a.sequence - b.sequence);
+      setPlanSongs(p => ({ ...p, [key]: songs }));
+    } catch (e) {
+      setError('Could not load songs for this service.');
+    } finally {
+      setLoadingSongs(p => ({ ...p, [key]: false }));
+    }
+  }
+
+  async function openPDF(song) {
+    setPdfViewer({ song, url: null });
+    setLoadingPdf(p => ({ ...p, [song.itemId]: true }));
+    try {
+      // Get attachments for this plan
+      const data = await pcoGet('attachments', { serviceTypeId: song.serviceTypeId, planId: song.planId });
+      const attachments = data.data || [];
+      // Find a PDF attachment for this song
+      const pdf = attachments.find(a => {
+        const filename = a.attributes?.filename || '';
+        const linked = a.relationships?.attachable?.data;
+        const isSong = linked?.type === 'Song' && linked?.id === song.songId;
+        const isPDF = filename.toLowerCase().endsWith('.pdf') || a.attributes?.content_type === 'application/pdf';
+        return isSong && isPDF;
+      }) || attachments.find(a => {
+        const filename = a.attributes?.filename || '';
+        return filename.toLowerCase().endsWith('.pdf');
+      });
+
+      if (pdf) {
+        // Get open URL
+        const urlData = await pcoGet('attachmentUrl', {
+          serviceTypeId: song.serviceTypeId,
+          planId: song.planId,
+          attachmentId: pdf.id,
+        });
+        const url = urlData.data?.attributes?.open_url || pdf.attributes?.file_download_url;
+        setPdfViewer({ song, url });
+      } else {
+        setPdfViewer({ song, url: 'none' });
+      }
+    } catch (e) {
+      setPdfViewer({ song, url: 'error' });
+    } finally {
+      setLoadingPdf(p => ({ ...p, [song.itemId]: false }));
+    }
+  }
+
+  function togglePlan(plan) {
+    if (expandedPlan === plan.id) {
+      setExpandedPlan(null);
+    } else {
+      setExpandedPlan(plan.id);
+      loadPlanSongs(plan);
+    }
+  }
+
+  function importAllToSetlist(planId) {
+    const songs = planSongs[planId] || [];
+    songs.forEach(song => onAddToSetlist(song));
+  }
+
+  const getDateParts = (dateStr) => {
+    if (!dateStr) return { day: '?', month: '???', full: '' };
+    const d = new Date(dateStr);
+    return {
+      day: d.getDate(),
+      month: d.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
+      full: formatDate(dateStr),
+    };
+  };
+
+  return (
+    <div className="pco-view">
+      <div className="pco-header">
+        <div>
+          <div className="pco-title">Planning Center</div>
+          <div className="pco-subtitle">Your upcoming scheduled services</div>
+        </div>
+        <button className="sync-btn" onClick={syncPlans} disabled={syncing}>
+          <span className={`sync-icon${syncing ? ' spinning' : ''}`}>↻</span>
+          {syncing ? 'Syncing…' : 'Sync'}
+        </button>
+      </div>
+
+      {error && <div className="error-card" style={{ marginBottom:12 }}>{error}</div>}
+
+      {!hasLoaded && !syncing && (
+        <div className="empty-state">
+          <div className="empty-icon">📅</div>
+          <div className="empty-title">Connect to Planning Center</div>
+          <div className="empty-sub">Tap Sync to pull your upcoming scheduled services and song lists directly from Planning Center.</div>
+        </div>
+      )}
+
+      {syncing && (
+        <div className="loading-screen">
+          <div className="loading-spinner" />
+          <div className="loading-text">Connecting to Planning Center…</div>
+        </div>
+      )}
+
+      {hasLoaded && !syncing && myPlans.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-icon">🎵</div>
+          <div className="empty-title">No upcoming services found</div>
+          <div className="empty-sub">You don't appear to be scheduled for any upcoming services, or your account may need Songs access enabled by your worship leader.</div>
+        </div>
+      )}
+
+      {hasLoaded && myPlans.length > 0 && (
+        <>
+          <div className="pco-section-label">Your scheduled services</div>
+          {myPlans.map(plan => {
+            const dp = getDateParts(plan.date);
+            const isExpanded = expandedPlan === plan.id;
+            const songs = planSongs[plan.id] || [];
+            const isLoadingSongs = loadingSongs[plan.id];
+            return (
+              <div key={plan.id} className={`service-card${isExpanded ? ' expanded' : ''}`} onClick={() => togglePlan(plan)}>
+                <div className="service-card-header">
+                  <div className="service-date-badge">
+                    <div className="service-date-day">{dp.day}</div>
+                    <div className="service-date-month">{dp.month}</div>
+                  </div>
+                  <div className="service-info">
+                    <div className="service-name">{plan.serviceName}</div>
+                    <div className="service-meta">{dp.full}</div>
+                    <div><span className="scheduled-badge">● You're scheduled</span></div>
+                  </div>
+                  <div className="service-chevron">▶</div>
+                </div>
+
+                {isExpanded && (
+                  <div className="service-songs" onClick={e => e.stopPropagation()}>
+                    <div className="service-songs-label">Songs</div>
+                    {isLoadingSongs && (
+                      <div style={{ textAlign:'center', padding:'20px 0' }}>
+                        <div className="loading-spinner" style={{ margin:'0 auto 8px' }} />
+                        <div style={{ fontSize:13, color:'var(--text3)' }}>Loading songs…</div>
+                      </div>
+                    )}
+                    {!isLoadingSongs && songs.length === 0 && (
+                      <div style={{ fontSize:13, color:'var(--text3)', padding:'8px 0' }}>No songs found for this service.</div>
+                    )}
+                    {songs.map((song, i) => (
+                      <div key={song.itemId} className="pco-song-row">
+                        <div className="pco-song-num">{i + 1}</div>
+                        <div className="pco-song-info">
+                          <div className="pco-song-title">{song.title}</div>
+                          <div className="pco-song-meta">
+                            {song.artist && `${song.artist} · `}
+                            {song.key && `Key: ${song.key}`}
+                            {song.bpm && ` · ♩${song.bpm}`}
+                          </div>
+                        </div>
+                        <div className="pco-song-actions">
+                          <button
+                            className="pco-btn pdf"
+                            onClick={() => openPDF(song)}
+                            disabled={loadingPdf[song.itemId]}
+                          >
+                            {loadingPdf[song.itemId] ? '…' : '📄 Chart'}
+                          </button>
+                          <button className="pco-btn" onClick={() => onAddToSetlist(song)}>+ List</button>
+                        </div>
+                      </div>
+                    ))}
+                    {songs.length > 0 && (
+                      <button className="import-all-btn" onClick={() => importAllToSetlist(plan.id)}>
+                        Import all {songs.length} songs to Setlist →
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {pdfViewer && (
+        <PDFViewer
+          song={pdfViewer.song}
+          url={pdfViewer.url === 'none' ? null : pdfViewer.url === 'error' ? null : pdfViewer.url}
+          onClose={() => setPdfViewer(null)}
+        />
+      )}
+      {pdfViewer?.url === 'none' && (
+        <div className="error-card" style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', width:'calc(100% - 32px)', maxWidth:600, zIndex:400 }}>
+          No PDF chart found for this song in Planning Center.
+          <button onClick={() => setPdfViewer(null)} style={{ float:'right', background:'none', border:'none', color:'var(--red)', cursor:'pointer', fontSize:16 }}>×</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [view, setView] = useState('search');
+  const [view, setView] = useState('services');
+
+  // Search
   const [songTitle, setSongTitle] = useState('');
   const [songArtist, setSongArtist] = useState('');
   const [loading, setLoading] = useState(false);
@@ -588,10 +955,12 @@ export default function App() {
   const [songData, setSongData] = useState(null);
   const [transpose, setTranspose] = useState(0);
 
+  // Library
   const [library, setLibrary] = useState(() => {
     try { return JSON.parse(localStorage.getItem('bass-library') || '[]'); } catch { return []; }
   });
 
+  // Setlist
   const [setlistName, setSetlistName] = useState('Sunday Service');
   const [addTitle, setAddTitle] = useState('');
   const [addArtist, setAddArtist] = useState('');
@@ -600,21 +969,6 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('bass-setlists') || '[]'); } catch { return []; }
   });
   const [stageOpen, setStageOpen] = useState(false);
-
-  // ── Fuse splash ──
-  const [showSplash, setShowSplash] = useState(() => {
-    return !sessionStorage.getItem('fuse_selah_launched_v2');
-  });
-  useEffect(() => {
-    if (showSplash) {
-      const t = setTimeout(() => {
-        setShowSplash(false);
-        sessionStorage.setItem('fuse_selah_launched_v2', '1');
-      }, 2400);
-      return () => clearTimeout(t);
-    }
-  }, [showSplash]);
-
   const dragIdx = useRef(null);
   const dragOverIdx = useRef(null);
 
@@ -643,9 +997,7 @@ export default function App() {
   }
 
   function loadFromLibrary(song) {
-    setSongData(song);
-    setTranspose(0);
-    setView('search');
+    setSongData(song); setTranspose(0); setView('search');
   }
 
   function addToSetlistFromLibrary(song) {
@@ -656,6 +1008,22 @@ export default function App() {
     setView('setlist');
   }
 
+  // Add from Planning Center — uses key from PCO if available
+  function addToSetlistFromPCO(pcoSong) {
+    setSetlistSongs(p => {
+      if (p.some(s => s.title === pcoSong.title)) return p;
+      return [...p, {
+        title: pcoSong.title,
+        artist: pcoSong.artist || '',
+        status: 'pending',
+        data: null,
+        pcoKey: pcoSong.key || '',
+      }];
+    });
+    setView('setlist');
+  }
+
+  // Setlist
   function addToSetlist() {
     if (!addTitle.trim()) return;
     setSetlistSongs(p => [...p, { title: addTitle.trim(), artist: addArtist.trim(), status: 'pending', data: null }]);
@@ -675,6 +1043,8 @@ export default function App() {
     setSetlistSongs(p => { const n=[...p]; n[i]={...n[i], status:'loading'}; return n; });
     try {
       const data = await fetchChart(song.title, song.artist);
+      // If PCO gave us a key, use it
+      if (song.pcoKey && data) data.key = song.pcoKey;
       setSetlistSongs(p => { const n=[...p]; n[i]={...n[i], status:'loaded', data}; return n; });
     } catch {
       setSetlistSongs(p => { const n=[...p]; n[i]={...n[i], status:'error'}; return n; });
@@ -700,32 +1070,9 @@ export default function App() {
   function onDrop() {
     if (dragIdx.current === null || dragOverIdx.current === null || dragIdx.current === dragOverIdx.current) return;
     setSetlistSongs(p => {
-      const arr = [...p];
-      const [moved] = arr.splice(dragIdx.current, 1);
-      arr.splice(dragOverIdx.current, 0, moved);
-      return arr;
+      const arr = [...p]; const [moved] = arr.splice(dragIdx.current, 1); arr.splice(dragOverIdx.current, 0, moved); return arr;
     });
     dragIdx.current = null; dragOverIdx.current = null;
-  }
-
-  const touchDragIdx = useRef(null);
-  function onTouchDragStart(e, i) { touchDragIdx.current = i; }
-  function onTouchDragEnd(e, i) {
-    const touch = e.changedTouches[0];
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    const itemEl = el?.closest('[data-setlist-idx]');
-    if (itemEl) {
-      const targetIdx = parseInt(itemEl.dataset.setlistIdx);
-      if (!isNaN(targetIdx) && targetIdx !== touchDragIdx.current) {
-        setSetlistSongs(p => {
-          const arr = [...p];
-          const [moved] = arr.splice(touchDragIdx.current, 1);
-          arr.splice(targetIdx, 0, moved);
-          return arr;
-        });
-      }
-    }
-    touchDragIdx.current = null;
   }
 
   const allLoaded = setlistSongs.length > 0 && setlistSongs.every(s => s.status === 'loaded');
@@ -735,22 +1082,6 @@ export default function App() {
   return (
     <>
       <style>{styles}</style>
-
-      {/* ── Fuse splash ── */}
-      {showSplash && (
-        <div className="fuse-splash">
-          <div className="fuse-splash-icon">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <line x1="5" y1="16" x2="22" y2="16" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-              <circle cx="22" cy="16" r="6" stroke="white" strokeWidth="2"/>
-              <circle cx="22" cy="16" r="2.4" fill="white"/>
-            </svg>
-          </div>
-          <div className="fuse-splash-name">Selah</div>
-          <div className="fuse-splash-by">Fuse Apps · by TNT Labs</div>
-        </div>
-      )}
-
       {stageOpen && <StageMode setlistName={setlistName} songs={setlistSongs} onExit={() => setStageOpen(false)} />}
 
       <div className="app">
@@ -759,14 +1090,20 @@ export default function App() {
             <div className="logo-icon">
               <svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 3a1 1 0 0 1 1 1v6.17A3 3 0 1 1 9 16V7a1 1 0 0 1 1-1h2zm-2 11a1 1 0 1 0 2 0 1 1 0 0 0-2 0z"/></svg>
             </div>
+            <span className="nav-title">Selah</span>
           </div>
           <div className="nav-tabs">
+            <button className={`nav-tab${view==='services'?' active':''}`} onClick={() => setView('services')}>Services</button>
             <button className={`nav-tab${view==='search'?' active':''}`} onClick={() => setView('search')}>Search</button>
-            <button className={`nav-tab${view==='library'?' active':''}`} onClick={() => setView('library')}>Library {library.length > 0 ? `(${library.length})` : ''}</button>
-            <button className={`nav-tab${view==='setlist'?' active':''}`} onClick={() => setView('setlist')}>Setlist {setlistSongs.length > 0 ? `(${setlistSongs.length})` : ''}</button>
+            <button className={`nav-tab${view==='library'?' active':''}`} onClick={() => setView('library')}>Library{library.length > 0 ? ` (${library.length})` : ''}</button>
+            <button className={`nav-tab${view==='setlist'?' active':''}`} onClick={() => setView('setlist')}>Setlist{setlistSongs.length > 0 ? ` (${setlistSongs.length})` : ''}</button>
           </div>
         </div>
 
+        {/* ── SERVICES (Planning Center) ── */}
+        {view === 'services' && <ServicesView onAddToSetlist={addToSetlistFromPCO} />}
+
+        {/* ── SEARCH ── */}
         {view === 'search' && (
           <>
             <div className="search-section">
@@ -784,12 +1121,8 @@ export default function App() {
                 <button className="btn-primary" style={{ flex:1 }} onClick={() => doSearch(songTitle, songArtist)} disabled={loading || !songTitle.trim()}>
                   {loading ? 'Loading…' : 'Look up chart ↗'}
                 </button>
-                {songData && !isInLibrary && (
-                  <button className="btn-ghost" onClick={saveToLibrary} title="Save to library">★ Save</button>
-                )}
-                {songData && isInLibrary && (
-                  <button className="btn-ghost" style={{ color:'var(--accent)', borderColor:'var(--accent)' }} disabled>★ Saved</button>
-                )}
+                {songData && !isInLibrary && <button className="btn-ghost" onClick={saveToLibrary}>★ Save</button>}
+                {songData && isInLibrary && <button className="btn-ghost" style={{ color:'var(--accent)', borderColor:'var(--accent)' }} disabled>★ Saved</button>}
                 {songData && (
                   <button className="btn-ghost" onClick={() => {
                     setSetlistSongs(p => {
@@ -804,58 +1137,44 @@ export default function App() {
                 {SUGGESTIONS.map(s => <div key={s.title} className="chip" onClick={() => quickSearch(s)}>{s.title}</div>)}
               </div>
             </div>
-
-            {loading && (
-              <div className="loading-screen">
-                <div className="loading-spinner" />
-                <div className="loading-text">Building bass chart…</div>
-                <div className="loading-sub">{songTitle}{songArtist ? ` · ${songArtist}` : ''}</div>
-              </div>
-            )}
+            {loading && <div className="loading-screen"><div className="loading-spinner" /><div className="loading-text">Building bass chart…</div><div className="loading-sub">{songTitle}{songArtist ? ` · ${songArtist}` : ''}</div></div>}
             {error && !loading && <div className="error-card">{error}</div>}
-
             {songData && !loading && (
               <div className="song-card">
                 <div className="song-card-header">
-                  <div>
-                    <div className="song-title">{songData.title}</div>
-                    <div className="song-artist">{songData.artist}</div>
-                  </div>
+                  <div><div className="song-title">{songData.title}</div><div className="song-artist">{songData.artist}</div></div>
                 </div>
                 <ChartContent data={songData} transpose={transpose} onTransposeChange={setTranspose} showTransport={true} />
               </div>
             )}
-
             {!songData && !loading && !error && (
               <div className="empty-state">
                 <div className="empty-icon">🎸</div>
                 <div className="empty-title">Ready to practice</div>
-                <div className="empty-sub">Search a worship song above, or tap a chip to get started. Hit ★ Save to add it to your library.</div>
+                <div className="empty-sub">Search any worship song, or tap a chip to get started.</div>
               </div>
             )}
           </>
         )}
 
+        {/* ── LIBRARY ── */}
         {view === 'library' && (
           <div className="library-view">
             <div className="library-label">My song library ({library.length})</div>
             {library.length === 0 ? (
-              <div className="library-empty">
-                <div style={{ fontSize:28, marginBottom:10 }}>📚</div>
-                No songs saved yet.<br />Search a song and hit <strong>★ Save</strong> to add it here.
-              </div>
+              <div className="library-empty"><div style={{ fontSize:28, marginBottom:10 }}>📚</div>No songs saved yet.<br />Search a song and hit <strong>★ Save</strong>.</div>
             ) : (
               <div className="library-items">
                 {library.map(song => (
-                  <div key={song.title + song.artist} className="library-item" onClick={() => loadFromLibrary(song)}>
-                    <div style={{ fontSize:16, color:'var(--accent)', flexShrink:0 }}>★</div>
+                  <div key={song.title+song.artist} className="library-item" onClick={() => loadFromLibrary(song)}>
+                    <div style={{ fontSize:15, color:'var(--accent)', flexShrink:0 }}>★</div>
                     <div className="library-item-info">
                       <div className="library-item-title">{song.title}</div>
                       <div className="library-item-sub">{song.artist} · Key: {song.key} · ♩{song.bpm}</div>
                     </div>
-                    <div className="library-item-actions" onClick={e => e.stopPropagation()}>
+                    <div className="library-item-actions" onClick={e=>e.stopPropagation()}>
                       <button className="lib-btn" onClick={() => addToSetlistFromLibrary(song)}>+ Setlist</button>
-                      <button className="lib-btn danger" onClick={() => removeFromLibrary(song.title, song.artist)}>×</button>
+                      <button className="lib-btn" onClick={() => removeFromLibrary(song.title, song.artist)}>×</button>
                     </div>
                   </div>
                 ))}
@@ -864,32 +1183,29 @@ export default function App() {
           </div>
         )}
 
+        {/* ── SETLIST ── */}
         {view === 'setlist' && (
           <div className="setlist-view">
             <input className="setlist-name-input" value={setlistName} onChange={e=>setSetlistName(e.target.value)} placeholder="Setlist name" />
             <div className="add-song-area">
-              <div className="add-area-label">Add song</div>
+              <div className="add-area-label">Add song manually</div>
               <div className="add-song-row">
                 <input className="text-input" type="text" placeholder="Song title" value={addTitle} onChange={e=>setAddTitle(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addToSetlist()} style={{ flex:2 }} />
                 <input className="text-input" type="text" placeholder="Artist" value={addArtist} onChange={e=>setAddArtist(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addToSetlist()} style={{ flex:1.5 }} />
                 <button className="add-btn" onClick={addToSetlist} disabled={!addTitle.trim()}>+ Add</button>
               </div>
             </div>
-
             {setlistSongs.length === 0 ? (
-              <div className="setlist-empty">
-                <div style={{ fontSize:26, marginBottom:8 }}>📋</div>
-                Add songs above or from your Library.<br />Hold ☰ to drag and reorder.
-              </div>
+              <div className="setlist-empty"><div style={{ fontSize:26, marginBottom:8 }}>📋</div>Add songs manually above, from your Library,<br />or import from the Services tab.</div>
             ) : (
               <div className="setlist-items">
                 {setlistSongs.map((song, i) => (
-                  <div key={i} data-setlist-idx={i} className={`setlist-item ${song.status}`} draggable onDragStart={() => onDragStart(i)} onDragOver={e => onDragOver(e, i)} onDrop={onDrop}>
-                    <div className="item-drag-handle" onTouchStart={e => onTouchDragStart(e, i)} onTouchEnd={e => onTouchDragEnd(e, i)}>☰</div>
+                  <div key={i} data-setlist-idx={i} className={`setlist-item ${song.status}`} draggable onDragStart={() => onDragStart(i)} onDragOver={e=>onDragOver(e,i)} onDrop={onDrop}>
+                    <div className="item-drag-handle">☰</div>
                     <div className="item-num">{i+1}</div>
                     <div className="item-info">
                       <div className="item-title">{song.title}</div>
-                      <div className="item-sub">{song.artist || '—'}{song.data ? ` · ${song.data.key} · ♩${song.data.bpm}` : ''}</div>
+                      <div className="item-sub">{song.artist || '—'}{song.data ? ` · ${song.data.key} · ♩${song.data.bpm}` : song.pcoKey ? ` · Key: ${song.pcoKey} (PCO)` : ''}</div>
                       {song.status === 'error' && <div style={{ fontSize:11, color:'var(--red)', marginTop:1 }}>Load failed</div>}
                     </div>
                     <div className={`status-dot ${song.status==='loaded'?'loaded':song.status==='loading'?'loading':song.status==='error'?'error':'pending'}`} />
@@ -901,7 +1217,6 @@ export default function App() {
                 ))}
               </div>
             )}
-
             {setlistSongs.length > 0 && (
               <>
                 <div className="setlist-footer">
@@ -917,37 +1232,19 @@ export default function App() {
                 </div>
               </>
             )}
-
             {savedSetlists.length > 0 && (
               <div className="saved-setlists">
                 <div className="saved-label">Saved setlists</div>
                 {savedSetlists.map(sl => (
                   <div key={sl.id} className="saved-item" onClick={() => loadSaved(sl)}>
-                    <div className="saved-item-info">
-                      <div className="saved-item-name">{sl.name}</div>
-                      <div className="saved-item-meta">{sl.songs.length} songs · {sl.date}</div>
-                    </div>
-                    <button className="saved-item-del" onClick={e => { e.stopPropagation(); setSavedSetlists(p=>p.filter(x=>x.id!==sl.id)); }}>×</button>
+                    <div className="saved-item-info"><div className="saved-item-name">{sl.name}</div><div className="saved-item-meta">{sl.songs.length} songs · {sl.date}</div></div>
+                    <button className="saved-item-del" onClick={e=>{ e.stopPropagation(); setSavedSetlists(p=>p.filter(x=>x.id!==sl.id)); }}>×</button>
                   </div>
                 ))}
               </div>
             )}
           </div>
         )}
-
-        {/* ── Fuse footer ── */}
-        <div className="fuse-footer">
-          <div className="fuse-footer-icon">
-            <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-              <line x1="1.5" y1="4.5" x2="6.5" y2="4.5" stroke="white" strokeWidth="1.3" strokeLinecap="round"/>
-              <circle cx="6.5" cy="4.5" r="1.8" stroke="white" strokeWidth="0.9"/>
-            </svg>
-          </div>
-          <span className="fuse-footer-word">Fuse Apps</span>
-          <span className="fuse-footer-sep">·</span>
-          <span className="fuse-footer-by">by TNT Labs</span>
-        </div>
-
       </div>
     </>
   );
