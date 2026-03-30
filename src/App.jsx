@@ -1023,7 +1023,6 @@ export default function App() {
   const touchDragIdx = useRef(null);
   const touchStartY = useRef(0);
   const [touchDragActive, setTouchDragActive] = useState(false);
-  const [touchDragY, setTouchDragY] = useState(0);
   const [touchOverIdx, setTouchOverIdx] = useState(null);
 
   function onTouchHandleStart(e, i) {
@@ -1031,7 +1030,6 @@ export default function App() {
     touchDragIdx.current = i;
     touchStartY.current = e.touches[0].clientY;
     setTouchDragActive(true);
-    setTouchDragY(e.touches[0].clientY);
     setTouchOverIdx(i);
   }
 
@@ -1204,16 +1202,6 @@ export default function App() {
     setSetlistName(suggested);
     setSetlistSongs([]);
     setView('setlist');
-  }
-
-  function onDragStart(i) { dragIdx.current = i; }
-  function onDragOver(e, i) { e.preventDefault(); dragOverIdx.current = i; }
-  function onDrop() {
-    if (dragIdx.current === null || dragOverIdx.current === null || dragIdx.current === dragOverIdx.current) return;
-    setSetlistSongs(p => {
-      const arr = [...p]; const [moved] = arr.splice(dragIdx.current, 1); arr.splice(dragOverIdx.current, 0, moved); return arr;
-    });
-    dragIdx.current = null; dragOverIdx.current = null;
   }
 
   const allLoaded = setlistSongs.length > 0 && setlistSongs.every(s => s.status === 'loaded');
