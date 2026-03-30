@@ -1272,7 +1272,7 @@ function ServicesView({ onAddToSetlist, instrument }) {
                       <div className="pco-song-meta">{song.artist && `${song.artist} · `}{song.key && `Key: ${song.key}`}{song.bpm && ` · ♩${song.bpm}`}</div>
                     </div>
                     <div className="pco-song-actions">
-                      <button className="pco-btn pdf" onClick={() => openPDF(song)} disabled={loadingPdf[song.itemId]}>📄 Chart</button>
+                      <button className="pco-btn pdf" onClick={() => openPDF(song)}>📄 Chart</button>
                       <button className="pco-btn" onClick={() => onAddToSetlist(song)}>+ List</button>
                     </div>
                   </div>
