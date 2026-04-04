@@ -60,13 +60,18 @@ export default async function handler(req, res) {
           `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items?include=attachments&per_page=25`
         );
       } catch (e) {}
+
+      // DEBUG — remove after testing
+      console.log('ATTACHMENTS planAttachments count:', planAttachments.data?.length);
+      console.log('ATTACHMENTS itemAttachments included:', JSON.stringify(itemAttachments.included?.slice(0,3)));
+
       return res.status(200).json({
         planAttachments: planAttachments.data || [],
         itemAttachments: itemAttachments.included?.filter(i => i.type === 'Attachment') || [],
         items: itemAttachments.data || [],
       });
     }
-
+    
     if (action === 'attachmentUrl' && serviceTypeId && planId && attachmentId) {
       try {
         const data = await pcoFetch(
