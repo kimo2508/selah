@@ -1141,7 +1141,24 @@ function ServicesView({ onAddToSetlist, instrument }) {
   const [pdfViewer, setPdfViewer] = useState(null);
   const [hasLoaded, setHasLoaded] = useState(false);
 
-  async function syncPlans() {
+  // Load persisted plans on mount, auto-expire past dates
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('selah-synced-plans');
+      if (saved) {
+        const { plans } = JSON.parse(saved);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const future = plans.filter(p => p.date && new Date(p.date) >= today);
+        if (future.length > 0) {
+          setMyPlans(future);
+          setHasLoaded(true);
+          // Update storage with expired ones removed
+          localStorage.setItem('selah-synced-plans', JSON.stringify({ plans: future, syncedAt: Date.now() }));
+        }
+      }
+    } catch {}
+  }, []);  async function syncPlans() {
     setSyncing(true); setError('');
     try {
       const data = await pcoGet('myPlans');
