@@ -117,9 +117,9 @@ export default async function handler(req, res) {
       if (serviceTypeId && planId && planItemId) {
         try {
           const data = await pcoFetch(
-            `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments/${attachmentId}/open`
-          );
-          console.log('ITEM OPEN full response:', JSON.stringify(data).slice(0, 500));
+  `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments/${attachmentId}/open`
+);
+console.log('ITEM OPEN full response:', JSON.stringify(data));
 return res.status(200).json(data);
         } catch (e) {
           console.log('ITEM OPEN failed:', e.message);
