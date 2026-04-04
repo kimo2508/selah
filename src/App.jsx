@@ -1142,6 +1142,7 @@ function ServicesView({ onAddToSetlist, instrument }) {
   const [hasLoaded, setHasLoaded] = useState(false);
 
   async function syncPlans() {
+    setSyncing(true); setError('');
     try {
       const data = await pcoGet('myPlans');
       const planPeople = data.data || [];
@@ -1160,13 +1161,14 @@ function ServicesView({ onAddToSetlist, instrument }) {
         enriched.push({ id: planRel.id, serviceTypeId: st?.id || stRel?.id, serviceName: st?.attributes?.name || 'Service', date: plan?.attributes?.sort_date, title: plan?.attributes?.title || '' });
       });
       enriched.sort((a, b) => new Date(a.date) - new Date(b.date));
+      // Persist to localStorage
+      try { localStorage.setItem('selah-synced-plans', JSON.stringify({ plans: enriched, syncedAt: Date.now() })); } catch {}
       setMyPlans(enriched);
       setHasLoaded(true);
     } catch (e) {
       setError('Could not connect to Planning Center. ' + e.message);
     } finally { setSyncing(false); }
   }
-
   async function loadPlanSongs(plan) {
     const key = plan.id;
     if (planSongs[key] || loadingSongs[key]) return;
