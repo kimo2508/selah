@@ -1440,11 +1440,20 @@ export default function App() {
     setView('setlist');
   }
 
-  function addToSetlistFromPCO(pcoSong) {
-    setSetlistSongs(p => { if (p.some(s => s.title === pcoSong.title)) return p; return [...p, { title: pcoSong.title, artist: pcoSong.artist || '', status: 'pending', data: null, pcoKey: pcoSong.key || '' }]; });
+  function addToSetlistFromPCO(pcoSong, planName) {
+    setSetlistSongs(p => {
+      if (p.some(s => s.title === pcoSong.title)) return p;
+      return [...p, {
+        title: pcoSong.title,
+        artist: pcoSong.artist || '',
+        status: 'pending',
+        data: null,
+        pcoKey: pcoSong.key || '',
+        planName: planName || ''
+      }];
+    });
     setView('setlist');
   }
-
   function addToSetlist() {
     if (!addTitle.trim()) return;
     setSetlistSongs(p => [...p, { title: addTitle.trim(), artist: addArtist.trim(), status: 'pending', data: null }]);
