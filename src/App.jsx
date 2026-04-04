@@ -1082,7 +1082,11 @@ function ServicesView({ onAddToSetlist }) {
           songId: song.songId || '',
           arrangementId: song.arrangementId || ''
         });
-        const url = urlData.data?.attributes?.open_url || urlData.data?.attributes?.file_download_url;
+        const url = urlData.data?.attributes?.open_url 
+  || urlData.data?.attributes?.file_download_url
+  || urlData.data?.attributes?.url
+  || urlData.open_url
+  || urlData.url;
         setPdfViewer({ song, url: url || 'none' });
       } else {
         setPdfViewer({ song, url: 'none' });
