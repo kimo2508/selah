@@ -1336,8 +1336,8 @@ function ServicesView({ onAddToSetlist, instrument }) {
                   </div>
                 ))}
                 {songs.length > 0 && (
-  <button className="import-all-btn" onClick={() => { songs.forEach(s => onAddToSetlist(s, plan.serviceName + ' · ' + dp.full)); setSetlistName(plan.serviceName + ' · ' + dp.full); }}>Import all {songs.length} songs → Setlist</button>
-)}          
+  <button className="import-all-btn" onClick={() => songs.forEach(s => onAddToSetlist(s, plan.serviceName + ' · ' + dp.full))}>Import all {songs.length} songs → Setlist</button>
+)}
               </div>
         );
       })}
@@ -1437,20 +1437,13 @@ export default function App() {
   }
 
   function addToSetlistFromPCO(pcoSong, planName) {
+    if (planName) setSetlistName(planName);
     setSetlistSongs(p => {
       if (p.some(s => s.title === pcoSong.title)) return p;
-      return [...p, {
-        title: pcoSong.title,
-        artist: pcoSong.artist || '',
-        status: 'pending',
-        data: null,
-        pcoKey: pcoSong.key || '',
-        planName: planName || ''
-      }];
+      return [...p, { title: pcoSong.title, artist: pcoSong.artist || '', status: 'pending', data: null, pcoKey: pcoSong.key || '', planName: planName || '' }];
     });
     setView('setlist');
-  }
-  function addToSetlist() {
+  }  function addToSetlist() {
     if (!addTitle.trim()) return;
     setSetlistSongs(p => [...p, { title: addTitle.trim(), artist: addArtist.trim(), status: 'pending', data: null }]);
     setAddTitle(''); setAddArtist('');
