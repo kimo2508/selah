@@ -769,7 +769,29 @@ function StageMode({ setlistName, songs, instrument, onExit, onOpenPDF }) {
   const st = tps[idx] || 0;
   const tKey = cur?.data ? transposeKey(cur.data.key || '', st) : '';
   const isDrums = inst.id === 'drums';
-
+  async function openChartForSong(song) {
+  // No-op if no PCO data
+  if (!song.itemId && !song.songId) return;
+  // Reuse the same pcoGet logic
+  try {
+    const data = await pcoGet('attachments', { serviceTypeId: song.serviceTypeId || '', planId: song.planId || '', planItemId: song.itemId || '', songId: song.songId || '', arrangementId: song.arrangementId || '' });
+    const allAttachments = [...(data.planAttachments||[]),...(data.itemAttachments||[]),...(data.songAttachments||[]),...(data.arrangementAttachments||[])];
+    const isPDF = a => { const fn=(a.attributes?.filename||'').toLowerCase(); const ct=(a.attributes?.content_type||'').toLowerCase(); return fn.endsWith('.pdf')||ct==='application/pdf'; };
+    const titleWords = song.title.toLowerCase().split(/\s+/).filter(w=>w.length>1);
+    const pdfs = allAttachments.filter(a=>isPDF(a));
+    let pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return fn.includes('chart')&&titleWords.some(w=>fn.includes(w));});
+    if (!pdf) pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return fn.includes('songselect')&&titleWords.some(w=>fn.includes(w));});
+    if (!pdf) pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return titleWords.some(w=>fn.includes(w))&&!fn.includes('lyric')&&!fn.includes('words')&&!fn.includes('vocal');});
+    if (!pdf) pdf = pdfs[0];
+    if (pdf) {
+      const urlData = await pcoGet('attachmentUrl', { serviceTypeId: song.serviceTypeId||'', planId: song.planId||'', planItemId: song.itemId||'', attachmentId: pdf.id, songId: song.songId||'', arrangementId: song.arrangementId||'' });
+      const attrs = urlData.data?.attributes||urlData.attributes||{};
+      const meta = urlData.meta||{};
+      const url = attrs.file_download_url||attrs.open_url||attrs.url||meta.file_download_url||meta.open_url||meta.url;
+      if (url) window.open(url, '_blank');
+    }
+  } catch(e) { console.error('Stage openPDF error:', e); }
+}
   function goTo(i) { if (i >= 0 && i < total) { setIdx(i); setDragX(0); } }
   function onTouchStart(e) { touchStartX.current = e.touches[0].clientX; isDragging.current = true; }
   function onTouchMove(e) { if (!isDragging.current) return; setDragX(e.touches[0].clientX - touchStartX.current); }
@@ -833,7 +855,7 @@ function StageMode({ setlistName, songs, instrument, onExit, onOpenPDF }) {
                       <button className={`stage-tab${sTab==='chart'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='chart'; return n; })}>{isDrums ? 'Map' : 'Chords'}</button>
                       {showTab && <button className={`stage-tab${sTab==='tab'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='tab'; return n; })}>{inst.tabLabel}</button>}
                       <button className={`stage-tab${sTab==='notes'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='notes'; return n; })}>Notes</button> 
-                      {song.itemId ? <button className="stage-tab" onClick={() => onOpenPDF(song)} style={{ borderColor:'var(--purple)', color:'var(--purple)' }}>📄 Chart</button> : null}                    
+{song.itemId ? <button className="stage-tab" onClick={() => openChartForSong(song)} style={{ borderColor:'var(--purple)', color:'var(--purple)' }}>📄 Chart</button> : null}
                     </div>
                     {sTab === 'chart' && (
                       isDrums ? (
@@ -1353,7 +1375,7 @@ export default function App() {
       )}
 
       {showInstPicker && <InstrumentPicker current={instrument} onSelect={selectInstrument} onClose={() => setShowInstPicker(false)} />}
-      {stageOpen && <StageMode setlistName={setlistName} songs={setlistSongs} instrument={instrument} onExit={() => setStageOpen(false)} onOpenPDF={openPDF} />}
+      {stageOpen && <StageMode setlistName={setlistName} songs={setlistSongs} instrument={instrument} onExit={() => setStageOpen(false)} onOpenPDF={() => {}} />}
       <div className="app">
         <div className="nav-bar">
           <div className="nav-logo" onClick={() => setShowInstPicker(true)}>
