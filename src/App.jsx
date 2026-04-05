@@ -755,7 +755,7 @@ function Onboarding({ onSelect }) {
 }
 
 // ── Stage Mode ───────────────────────────────────────────────────────────────
-function StageMode({ setlistName, songs, instrument, onExit }) {
+function StageMode({ setlistName, songs, instrument, onExit, onOpenPDF }) {
   const inst = getInstrument(instrument);
   const [idx, setIdx] = useState(0);
   const [tps, setTps] = useState(() => songs.map(() => 0));
@@ -832,7 +832,8 @@ function StageMode({ setlistName, songs, instrument, onExit }) {
                     <div className="stage-tabs">
                       <button className={`stage-tab${sTab==='chart'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='chart'; return n; })}>{isDrums ? 'Map' : 'Chords'}</button>
                       {showTab && <button className={`stage-tab${sTab==='tab'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='tab'; return n; })}>{inst.tabLabel}</button>}
-                      <button className={`stage-tab${sTab==='notes'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='notes'; return n; })}>Notes</button>
+                      <button className={`stage-tab${sTab==='notes'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='notes'; return n; })}>Notes</button> 
+                      {song.itemId ? <button className="stage-tab" onClick={() => onOpenPDF(song)} style={{ borderColor:'var(--purple)', color:'var(--purple)' }}>📄 Chart</button> : null}                    
                     </div>
                     {sTab === 'chart' && (
                       isDrums ? (
@@ -943,10 +944,12 @@ function PDFViewer({ song, url, onClose }) {
       <div className="pdf-body">
         {url && url !== 'none' && url !== 'error' ? (
           <>
-            <iframe className="pdf-frame" src={url} title={song.title} />
-            <a href={url} target="_blank" rel="noopener noreferrer">
-              <button className="pdf-open-btn">Open in browser ↗</button>
-            </a>
+            <div style={{ textAlign:'center', padding:'20px' }}>
+  <div style={{ fontSize:14, color:'var(--text2)', marginBottom:16 }}>Tap to open the chord chart</div>
+  <a href={url} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none' }}>
+    <button className="pdf-open-btn">Open Chord Chart ↗</button>
+  </a>
+</div>
           </>
         ) : (
           <div className="pdf-loading">
@@ -1350,8 +1353,7 @@ export default function App() {
       )}
 
       {showInstPicker && <InstrumentPicker current={instrument} onSelect={selectInstrument} onClose={() => setShowInstPicker(false)} />}
-      {stageOpen && <StageMode setlistName={setlistName} songs={setlistSongs} instrument={instrument} onExit={() => setStageOpen(false)} />}
-
+      {stageOpen && <StageMode setlistName={setlistName} songs={setlistSongs} instrument={instrument} onExit={() => setStageOpen(false)} onOpenPDF={openPDF} />}
       <div className="app">
         <div className="nav-bar">
           <div className="nav-logo" onClick={() => setShowInstPicker(true)}>
