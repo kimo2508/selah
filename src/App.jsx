@@ -770,9 +770,10 @@ function StageMode({ setlistName, songs, instrument, onExit, onOpenPDF }) {
   const tKey = cur?.data ? transposeKey(cur.data.key || '', st) : '';
   const isDrums = inst.id === 'drums';
   async function openChartForSong(song) {
-  // No-op if no PCO data
   if (!song.itemId && !song.songId) return;
-  // Reuse the same pcoGet logic
+  // Open window immediately on tap to avoid Safari popup blocker
+  const win = window.open('', '_blank');
+  if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">Loading chord chart…</p>');
   try {
     const data = await pcoGet('attachments', { serviceTypeId: song.serviceTypeId || '', planId: song.planId || '', planItemId: song.itemId || '', songId: song.songId || '', arrangementId: song.arrangementId || '' });
     const allAttachments = [...(data.planAttachments||[]),...(data.itemAttachments||[]),...(data.songAttachments||[]),...(data.arrangementAttachments||[])];
@@ -788,11 +789,16 @@ function StageMode({ setlistName, songs, instrument, onExit, onOpenPDF }) {
       const attrs = urlData.data?.attributes||urlData.attributes||{};
       const meta = urlData.meta||{};
       const url = attrs.file_download_url||attrs.open_url||attrs.url||meta.file_download_url||meta.open_url||meta.url;
-      if (url) {
-  const win = window.open('', '_blank');
-  if (win) win.location.href = url;
-}
+      if (url && win) win.location.href = url;
+      else if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">No chart found for this song.</p>');
+    } else {
+      if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">No chart found for this song.</p>');
     }
+  } catch(e) {
+    if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:red">Error loading chart.</p>');
+  }
+}
+}
   } catch(e) { console.error('Stage openPDF error:', e); }
 }
   function goTo(i) { if (i >= 0 && i < total) { setIdx(i); setDragX(0); } }
