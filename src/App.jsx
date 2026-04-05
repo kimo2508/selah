@@ -1056,23 +1056,24 @@ function ServicesView({ onAddToSetlist }) {
         ...(data.arrangementAttachments || []),
       ];
 
-      const isPDF = a => {
+     const isPDF = a => {
         const fn = (a.attributes?.filename || '').toLowerCase();
         const ct = (a.attributes?.content_type || '').toLowerCase();
         return fn.endsWith('.pdf') || ct === 'application/pdf';
       };
-
-      // Try to match by any word from the song title in the filename
       const titleWords = song.title.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-      let pdf = allAttachments.find(a => {
-        if (!isPDF(a)) return false;
-        const fn = (a.attributes?.filename || '').toLowerCase();
-        return titleWords.some(w => fn.includes(w));
-      });
-
-      // Fall back — any PDF at all
-      if (!pdf) pdf = allAttachments.find(a => isPDF(a));
-
+      const pdfs = allAttachments.filter(a => isPDF(a));
+      // Priority 1: "chart" + song title
+      let pdf = pdfs.find(a => { const fn = (a.attributes?.filename || '').toLowerCase(); return fn.includes('chart') && titleWords.some(w => fn.includes(w)); });
+      // Priority 2: "songselect" + song title
+      if (!pdf) pdf = pdfs.find(a => { const fn = (a.attributes?.filename || '').toLowerCase(); return fn.includes('songselect') && titleWords.some(w => fn.includes(w)); });
+      // Priority 3: song title but NOT lyric/words/vocal
+      if (!pdf) pdf = pdfs.find(a => { const fn = (a.attributes?.filename || '').toLowerCase(); return titleWords.some(w => fn.includes(w)) && !fn.includes('lyric') && !fn.includes('words') && !fn.includes('vocal'); });
+      // Priority 4: any PDF with song title
+      if (!pdf) pdf = pdfs.find(a => { const fn = (a.attributes?.filename || '').toLowerCase(); return titleWords.some(w => fn.includes(w)); });
+      // Last resort
+      if (!pdf) pdf = pdfs[0];
+      
       if (pdf) {
         const urlData = await pcoGet('attachmentUrl', {
           serviceTypeId: song.serviceTypeId,
