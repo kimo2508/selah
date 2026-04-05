@@ -1083,15 +1083,21 @@ function ServicesView({ onAddToSetlist }) {
           arrangementId: song.arrangementId || ''
         });
         const attrs = urlData.data?.attributes || urlData.attributes || {};
+const meta = urlData.meta || {};
 const url = attrs.open_url 
   || attrs.attachment_url
   || attrs.file_download_url
   || attrs.download_url
   || attrs.url
+  || meta.open_url
+  || meta.attachment_url
+  || meta.file_download_url
+  || meta.download_url
+  || meta.url
   || urlData.open_url
   || urlData.attachment_url
   || urlData.url;
-console.log('PDF URL extracted:', url, 'from attrs:', JSON.stringify(attrs));
+        console.log('PDF URL extracted:', url, 'from attrs:', JSON.stringify(attrs));
         setPdfViewer({ song, url: url || 'none' });
       } else {
         setPdfViewer({ song, url: 'none' });
