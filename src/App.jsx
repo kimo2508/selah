@@ -1284,11 +1284,23 @@ export default function App() {
     if (planName) setSetlistName(planName);
     setSetlistSongs(p => {
       if (p.some(s => s.title === pcoSong.title)) return p;
-      return [...p, { title: pcoSong.title, artist: pcoSong.artist || '', status: 'pending', data: null, pcoKey: pcoSong.key || '', planName: planName || '' }];
+      return [...p, {
+        title: pcoSong.title,
+        artist: pcoSong.artist || '',
+        status: 'pending',
+        data: null,
+        pcoKey: pcoSong.key || '',
+        planName: planName || '',
+        itemId: pcoSong.itemId || '',
+        songId: pcoSong.songId || '',
+        arrangementId: pcoSong.arrangementId || '',
+        serviceTypeId: pcoSong.serviceTypeId || '',
+        planId: pcoSong.planId || '',
+      }];
     });
     setView('setlist');
   }
-
+  
   function addToSetlist() {
     if (!addTitle.trim()) return;
     setSetlistSongs(p => [...p, { title: addTitle.trim(), artist: addArtist.trim(), status: 'pending', data: null }]);
