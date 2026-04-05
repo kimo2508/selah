@@ -798,7 +798,6 @@ function StageMode({ setlistName, songs, instrument, onExit, onOpenPDF }) {
     if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:red">Error loading chart.</p>');
   }
 }
-}
   } catch(e) { console.error('Stage openPDF error:', e); }
 }
   function goTo(i) { if (i >= 0 && i < total) { setIdx(i); setDragX(0); } }
