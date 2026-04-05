@@ -50,43 +50,36 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    // ── Get attachments — check every possible location ───────────────────
     if (action === 'attachments' && serviceTypeId && planId) {
       const results = {};
 
-      // 1. Plan item level (the "Files" tab when you tap a song in the Order tab)
       if (planItemId) {
         try {
           const r = await pcoFetch(
             `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments?per_page=50`
           );
           results.itemAttachments = r.data || [];
-          console.log('ITEM attachments:', results.itemAttachments.length, JSON.stringify(results.itemAttachments.map(a => a.attributes?.filename)));
+          console.log('ITEM atts:', results.itemAttachments.length, JSON.stringify(results.itemAttachments.map(a => a.attributes?.filename)));
         } catch (e) {
-          console.log('ITEM attachments failed:', e.message);
           results.itemAttachments = [];
         }
       } else {
         results.itemAttachments = [];
       }
 
-      // 2. Plan level
       try {
         const r = await pcoFetch(
           `/services/v2/service_types/${serviceTypeId}/plans/${planId}/attachments?per_page=50`
         );
         results.planAttachments = r.data || [];
-        console.log('PLAN attachments:', results.planAttachments.length);
       } catch (e) {
         results.planAttachments = [];
       }
 
-      // 3. Song library level
       if (songId) {
         try {
           const r = await pcoFetch(`/services/v2/songs/${songId}/attachments?per_page=50`);
           results.songAttachments = r.data || [];
-          console.log('SONG attachments:', results.songAttachments.length, JSON.stringify(results.songAttachments.map(a => a.attributes?.filename)));
         } catch (e) {
           results.songAttachments = [];
         }
@@ -94,12 +87,10 @@ export default async function handler(req, res) {
         results.songAttachments = [];
       }
 
-      // 4. Arrangement level
       if (songId && arrangementId) {
         try {
           const r = await pcoFetch(`/services/v2/songs/${songId}/arrangements/${arrangementId}/attachments?per_page=50`);
           results.arrangementAttachments = r.data || [];
-          console.log('ARR attachments:', results.arrangementAttachments.length, JSON.stringify(results.arrangementAttachments.map(a => a.attributes?.filename)));
         } catch (e) {
           results.arrangementAttachments = [];
         }
@@ -110,66 +101,19 @@ export default async function handler(req, res) {
       return res.status(200).json(results);
     }
 
-// ── Get signed URL for a specific attachment ──────────────────────────────
-if (action === 'attachmentUrl' && attachmentId) {
-  if (serviceTypeId && planId && planItemId) {
-    try {
-      const data = await pcoFetch(
-        `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments/${attachmentId}`
-      );
-      const attrs = data?.data?.attributes || {};
-      console.log('ATTACHMENT_DIRECT:', JSON.stringify(attrs));
-      return res.status(200).json(data);
-    } catch (e) {
-      console.log('ATTACHMENT_DIRECT failed:', e.message);
-    }
-  }
-  return res.status(404).json({ error: 'Could not get attachment URL' });
-}  catch (e) {
-          console.log('ITEM OPEN failed:', e.message);
-        }
-      }
-
-      // Try song level
-      if (songId) {
-        try {
-          const data = await pcoFetch(`/services/v2/songs/${songId}/attachments/${attachmentId}/open`);
-          console.log('SONG OPEN success');
-          return res.status(200).json(data);
-        } catch (e) {
-          console.log('SONG OPEN failed:', e.message);
-        }
-        if (arrangementId) {
-          try {
-            const data = await pcoFetch(`/services/v2/songs/${songId}/arrangements/${arrangementId}/attachments/${attachmentId}/open`);
-            console.log('ARR OPEN success');
-            return res.status(200).json(data);
-          } catch (e) {
-            console.log('ARR OPEN failed:', e.message);
-          }
-        }
-      }
-
-      // Try plan level
-      if (serviceTypeId && planId) {
+    if (action === 'attachmentUrl' && attachmentId) {
+      if (serviceTypeId && planId && planItemId) {
         try {
           const data = await pcoFetch(
-            `/services/v2/service_types/${serviceTypeId}/plans/${planId}/attachments/${attachmentId}/open`
+            `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments/${attachmentId}`
           );
-          console.log('PLAN OPEN success');
+          const attrs = data?.data?.attributes || {};
+          console.log('ATTACHMENT_DIRECT:', JSON.stringify(attrs));
           return res.status(200).json(data);
         } catch (e) {
-          console.log('PLAN OPEN failed:', e.message);
-          // Return raw attachment data as last resort
-          try {
-            const data = await pcoFetch(
-              `/services/v2/service_types/${serviceTypeId}/plans/${planId}/attachments/${attachmentId}`
-            );
-            return res.status(200).json(data);
-          } catch (e2) {}
+          console.log('ATTACHMENT_DIRECT failed:', e.message);
         }
       }
-
       return res.status(404).json({ error: 'Could not get attachment URL' });
     }
 
