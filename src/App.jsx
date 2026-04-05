@@ -61,9 +61,10 @@ function getInstrument(id) {
 }
 
 // ── Instrument-specific AI prompts ───────────────────────────────────────────
-function buildPrompt(title, artist, instrumentId) {
-  const base = `Song: "${title}" by "${artist || 'unknown'}". Return ONLY valid JSON, no markdown, no backticks.`;
-
+function buildPrompt(title, artist, instrumentId, songKey = '') {
+  const keyInstruction = songKey ? ` The song is in the key of ${songKey}. Generate the chart in exactly this key.` : '';
+  const base = `Song: "${title}" by "${artist || 'unknown'}".${keyInstruction} Return ONLY valid JSON, no markdown, no backticks.`;
+  
   if (instrumentId === 'drums') {
     return `${base}
 Generate a drum roadmap for this worship song.
@@ -203,7 +204,7 @@ Generate a bass guitar chart for this worship song. Sections must have lines —
 }
 
 // ── AI chart fetch ───────────────────────────────────────────────────────────
-async function fetchChart(title, artist, instrumentId = 'bass') {
+async function fetchChart(title, artist, instrumentId = 'bass', songKey = '') {
   const resp = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -211,7 +212,7 @@ async function fetchChart(title, artist, instrumentId = 'bass') {
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1800,
       system: 'You are an expert worship musician and music director. You know bass, guitar, keys, drums, and vocals inside out. Return ONLY valid JSON. No markdown, no backticks, no explanation.',
-      messages: [{ role: 'user', content: buildPrompt(title, artist, instrumentId) }]
+      messages: [{ role: 'user', content: buildPrompt(title, artist, instrumentId, songKey) }]
     })
   });
   const data = await resp.json();
@@ -1274,7 +1275,7 @@ export default function App() {
     if (cached) { setSetlistSongs(p => { const n=[...p]; n[i]={...n[i], status:'loaded', data:cached}; return n; }); return; }
     setSetlistSongs(p => { const n=[...p]; n[i]={...n[i], status:'loading'}; return n; });
     try {
-      const data = await fetchChart(song.title, song.artist, instrument || 'bass');
+      const data = await fetchChart(song.title, song.artist, instrument || 'bass', song.pcoKey || '');
       if (song.pcoKey && data) data.key = song.pcoKey;
       setSetlistSongs(p => { const n=[...p]; n[i]={...n[i], status:'loaded', data}; return n; });
     } catch { setSetlistSongs(p => { const n=[...p]; n[i]={...n[i], status:'error'}; return n; }); }
