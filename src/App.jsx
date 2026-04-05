@@ -788,7 +788,10 @@ function StageMode({ setlistName, songs, instrument, onExit, onOpenPDF }) {
       const attrs = urlData.data?.attributes||urlData.attributes||{};
       const meta = urlData.meta||{};
       const url = attrs.file_download_url||attrs.open_url||attrs.url||meta.file_download_url||meta.open_url||meta.url;
-      if (url) window.open(url, '_blank');
+      if (url) {
+  const win = window.open('', '_blank');
+  if (win) win.location.href = url;
+}
     }
   } catch(e) { console.error('Stage openPDF error:', e); }
 }
