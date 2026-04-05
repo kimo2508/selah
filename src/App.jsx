@@ -755,7 +755,7 @@ function Onboarding({ onSelect }) {
 }
 
 // ── Stage Mode ───────────────────────────────────────────────────────────────
-function StageMode({ setlistName, songs, instrument, onExit, onOpenPDF }) {
+function StageMode({ setlistName, songs, instrument, onExit }) {
   const inst = getInstrument(instrument);
   const [idx, setIdx] = useState(0);
   const [tps, setTps] = useState(() => songs.map(() => 0));
@@ -769,37 +769,36 @@ function StageMode({ setlistName, songs, instrument, onExit, onOpenPDF }) {
   const st = tps[idx] || 0;
   const tKey = cur?.data ? transposeKey(cur.data.key || '', st) : '';
   const isDrums = inst.id === 'drums';
+
   async function openChartForSong(song) {
-  if (!song.itemId && !song.songId) return;
-  // Open window immediately on tap to avoid Safari popup blocker
-  const win = window.open('', '_blank');
-  if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">Loading chord chart…</p>');
-  try {
-    const data = await pcoGet('attachments', { serviceTypeId: song.serviceTypeId || '', planId: song.planId || '', planItemId: song.itemId || '', songId: song.songId || '', arrangementId: song.arrangementId || '' });
-    const allAttachments = [...(data.planAttachments||[]),...(data.itemAttachments||[]),...(data.songAttachments||[]),...(data.arrangementAttachments||[])];
-    const isPDF = a => { const fn=(a.attributes?.filename||'').toLowerCase(); const ct=(a.attributes?.content_type||'').toLowerCase(); return fn.endsWith('.pdf')||ct==='application/pdf'; };
-    const titleWords = song.title.toLowerCase().split(/\s+/).filter(w=>w.length>1);
-    const pdfs = allAttachments.filter(a=>isPDF(a));
-    let pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return fn.includes('chart')&&titleWords.some(w=>fn.includes(w));});
-    if (!pdf) pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return fn.includes('songselect')&&titleWords.some(w=>fn.includes(w));});
-    if (!pdf) pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return titleWords.some(w=>fn.includes(w))&&!fn.includes('lyric')&&!fn.includes('words')&&!fn.includes('vocal');});
-    if (!pdf) pdf = pdfs[0];
-    if (pdf) {
-      const urlData = await pcoGet('attachmentUrl', { serviceTypeId: song.serviceTypeId||'', planId: song.planId||'', planItemId: song.itemId||'', attachmentId: pdf.id, songId: song.songId||'', arrangementId: song.arrangementId||'' });
-      const attrs = urlData.data?.attributes||urlData.attributes||{};
-      const meta = urlData.meta||{};
-      const url = attrs.file_download_url||attrs.open_url||attrs.url||meta.file_download_url||meta.open_url||meta.url;
-      if (url && win) win.location.href = url;
-      else if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">No chart found for this song.</p>');
-    } else {
-      if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">No chart found for this song.</p>');
+    if (!song.itemId && !song.songId) return;
+    const win = window.open('', '_blank');
+    if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">Loading chord chart…</p>');
+    try {
+      const data = await pcoGet('attachments', { serviceTypeId: song.serviceTypeId || '', planId: song.planId || '', planItemId: song.itemId || '', songId: song.songId || '', arrangementId: song.arrangementId || '' });
+      const allAtts = [...(data.planAttachments||[]),...(data.itemAttachments||[]),...(data.songAttachments||[]),...(data.arrangementAttachments||[])];
+      const isPDF = a => { const fn=(a.attributes?.filename||'').toLowerCase(); const ct=(a.attributes?.content_type||'').toLowerCase(); return fn.endsWith('.pdf')||ct==='application/pdf'; };
+      const titleWords = song.title.toLowerCase().split(/\s+/).filter(w=>w.length>1);
+      const pdfs = allAtts.filter(a=>isPDF(a));
+      let pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return fn.includes('chart')&&titleWords.some(w=>fn.includes(w));});
+      if (!pdf) pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return fn.includes('songselect')&&titleWords.some(w=>fn.includes(w));});
+      if (!pdf) pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return titleWords.some(w=>fn.includes(w))&&!fn.includes('lyric')&&!fn.includes('words')&&!fn.includes('vocal');});
+      if (!pdf) pdf = pdfs[0];
+      if (pdf) {
+        const urlData = await pcoGet('attachmentUrl', { serviceTypeId: song.serviceTypeId||'', planId: song.planId||'', planItemId: song.itemId||'', attachmentId: pdf.id, songId: song.songId||'', arrangementId: song.arrangementId||'' });
+        const attrs = urlData.data?.attributes||urlData.attributes||{};
+        const meta = urlData.meta||{};
+        const url = attrs.file_download_url||attrs.open_url||attrs.url||meta.file_download_url||meta.open_url||meta.url;
+        if (url && win) win.location.href = url;
+        else if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">No chart found.</p>');
+      } else {
+        if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">No chart found.</p>');
+      }
+    } catch(e) {
+      if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:red">Error loading chart.</p>');
     }
-  } catch(e) {
-    if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:red">Error loading chart.</p>');
   }
 
-  } catch(e) { console.error('Stage openPDF error:', e); }
-}
   function goTo(i) { if (i >= 0 && i < total) { setIdx(i); setDragX(0); } }
   function onTouchStart(e) { touchStartX.current = e.touches[0].clientX; isDragging.current = true; }
   function onTouchMove(e) { if (!isDragging.current) return; setDragX(e.touches[0].clientX - touchStartX.current); }
@@ -862,8 +861,8 @@ function StageMode({ setlistName, songs, instrument, onExit, onOpenPDF }) {
                     <div className="stage-tabs">
                       <button className={`stage-tab${sTab==='chart'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='chart'; return n; })}>{isDrums ? 'Map' : 'Chords'}</button>
                       {showTab && <button className={`stage-tab${sTab==='tab'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='tab'; return n; })}>{inst.tabLabel}</button>}
-                      <button className={`stage-tab${sTab==='notes'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='notes'; return n; })}>Notes</button> 
-{song.itemId ? <button className="stage-tab" onClick={() => openChartForSong(song)} style={{ borderColor:'var(--purple)', color:'var(--purple)' }}>📄 Chart</button> : null}
+                      <button className={`stage-tab${sTab==='notes'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='notes'; return n; })}>Notes</button>
+                      {song.itemId && <button className="stage-tab" onClick={() => openChartForSong(song)} style={{ borderColor:'var(--purple)', color:'var(--purple)' }}>📄 Chart</button>}
                     </div>
                     {sTab === 'chart' && (
                       isDrums ? (
@@ -974,12 +973,10 @@ function PDFViewer({ song, url, onClose }) {
       <div className="pdf-body">
         {url && url !== 'none' && url !== 'error' ? (
           <>
-            <div style={{ textAlign:'center', padding:'20px' }}>
-  <div style={{ fontSize:14, color:'var(--text2)', marginBottom:16 }}>Tap to open the chord chart</div>
-  <a href={url} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none' }}>
-    <button className="pdf-open-btn">Open Chord Chart ↗</button>
-  </a>
-</div>
+            <iframe className="pdf-frame" src={url} title={song.title} />
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <button className="pdf-open-btn">Open in browser ↗</button>
+            </a>
           </>
         ) : (
           <div className="pdf-loading">
@@ -1074,65 +1071,30 @@ function ServicesView({ onAddToSetlist }) {
   async function openPDF(song) {
     setPdfViewer({ song, url: null });
     try {
-      const data = await pcoGet('attachments', {
-        serviceTypeId: song.serviceTypeId,
-        planId: song.planId,
-        planItemId: song.itemId || '',
-        songId: song.songId || '',
-        arrangementId: song.arrangementId || ''
-      });
-
+      const data = await pcoGet('attachments', { serviceTypeId: song.serviceTypeId, planId: song.planId });
       const allAttachments = [
         ...(data.planAttachments || data.data || []),
         ...(data.itemAttachments || []),
-        ...(data.songAttachments || []),
-        ...(data.arrangementAttachments || []),
       ];
-
-     const isPDF = a => {
+      const isPDF = a => (a.attributes?.filename || a.attributes?.description || '').toLowerCase().endsWith('.pdf') || a.attributes?.content_type === 'application/pdf';
+      const titleWords = song.title.toLowerCase().split(' ').filter(w => w.length > 2);
+      let pdf = allAttachments.find(a => {
+        if (!isPDF(a)) return false;
         const fn = (a.attributes?.filename || '').toLowerCase();
-        const ct = (a.attributes?.content_type || '').toLowerCase();
-        return fn.endsWith('.pdf') || ct === 'application/pdf';
-      };
-      const titleWords = song.title.toLowerCase().split(/\s+/).filter(w => w.length > 1);
-      const pdfs = allAttachments.filter(a => isPDF(a));
-      // Priority 1: "chart" + song title
-      let pdf = pdfs.find(a => { const fn = (a.attributes?.filename || '').toLowerCase(); return fn.includes('chart') && titleWords.some(w => fn.includes(w)); });
-      // Priority 2: "songselect" + song title
-      if (!pdf) pdf = pdfs.find(a => { const fn = (a.attributes?.filename || '').toLowerCase(); return fn.includes('songselect') && titleWords.some(w => fn.includes(w)); });
-      // Priority 3: song title but NOT lyric/words/vocal
-      if (!pdf) pdf = pdfs.find(a => { const fn = (a.attributes?.filename || '').toLowerCase(); return titleWords.some(w => fn.includes(w)) && !fn.includes('lyric') && !fn.includes('words') && !fn.includes('vocal'); });
-      // Priority 4: any PDF with song title
-      if (!pdf) pdf = pdfs.find(a => { const fn = (a.attributes?.filename || '').toLowerCase(); return titleWords.some(w => fn.includes(w)); });
-      // Last resort
-      if (!pdf) pdf = pdfs[0];
-      
-      if (pdf) {
-        const urlData = await pcoGet('attachmentUrl', {
-          serviceTypeId: song.serviceTypeId,
-          planId: song.planId,
-          planItemId: song.itemId || '',
-          attachmentId: pdf.id,
-          songId: song.songId || '',
-          arrangementId: song.arrangementId || ''
+        return titleWords.some(w => fn.includes(w));
+      });
+      if (!pdf) {
+        pdf = allAttachments.find(a => {
+          if (!isPDF(a)) return false;
+          const linked = a.relationships?.attachable?.data;
+          return linked?.id === song.songId;
         });
-        const attrs = urlData.data?.attributes || urlData.attributes || {};
-const meta = urlData.meta || {};
-const url = attrs.open_url 
-  || attrs.attachment_url
-  || attrs.file_download_url
-  || attrs.download_url
-  || attrs.url
-  || meta.open_url
-  || meta.attachment_url
-  || meta.file_download_url
-  || meta.download_url
-  || meta.url
-  || urlData.open_url
-  || urlData.attachment_url
-  || urlData.url;
-        console.log('PDF URL extracted:', url, 'from attrs:', JSON.stringify(attrs));
-        setPdfViewer({ song, url: url || 'none' });
+      }
+      if (!pdf) pdf = allAttachments.find(a => isPDF(a));
+      if (pdf) {
+        const urlData = await pcoGet('attachmentUrl', { serviceTypeId: song.serviceTypeId, planId: song.planId, attachmentId: pdf.id });
+        const url = urlData.data?.attributes?.open_url || pdf.attributes?.file_download_url;
+        setPdfViewer({ song, url });
       } else {
         setPdfViewer({ song, url: 'none' });
       }
@@ -1141,7 +1103,7 @@ const url = attrs.open_url
       setPdfViewer({ song, url: 'error' });
     }
   }
-  
+
   function togglePlan(plan) {
     if (expandedPlan === plan.id) { setExpandedPlan(null); } else { setExpandedPlan(plan.id); loadPlanSongs(plan); }
   }
@@ -1292,23 +1254,11 @@ export default function App() {
     if (planName) setSetlistName(planName);
     setSetlistSongs(p => {
       if (p.some(s => s.title === pcoSong.title)) return p;
-      return [...p, {
-        title: pcoSong.title,
-        artist: pcoSong.artist || '',
-        status: 'pending',
-        data: null,
-        pcoKey: pcoSong.key || '',
-        planName: planName || '',
-        itemId: pcoSong.itemId || '',
-        songId: pcoSong.songId || '',
-        arrangementId: pcoSong.arrangementId || '',
-        serviceTypeId: pcoSong.serviceTypeId || '',
-        planId: pcoSong.planId || '',
-      }];
+      return [...p, { title: pcoSong.title, artist: pcoSong.artist || '', status: 'pending', data: null, pcoKey: pcoSong.key || '', planName: planName || '', itemId: pcoSong.itemId || '', songId: pcoSong.songId || '', arrangementId: pcoSong.arrangementId || '', serviceTypeId: pcoSong.serviceTypeId || '', planId: pcoSong.planId || '' }];
     });
     setView('setlist');
   }
-  
+
   function addToSetlist() {
     if (!addTitle.trim()) return;
     setSetlistSongs(p => [...p, { title: addTitle.trim(), artist: addArtist.trim(), status: 'pending', data: null }]);
@@ -1395,7 +1345,8 @@ export default function App() {
       )}
 
       {showInstPicker && <InstrumentPicker current={instrument} onSelect={selectInstrument} onClose={() => setShowInstPicker(false)} />}
-      {stageOpen && <StageMode setlistName={setlistName} songs={setlistSongs} instrument={instrument} onExit={() => setStageOpen(false)} onOpenPDF={() => {}} />}
+      {stageOpen && <StageMode setlistName={setlistName} songs={setlistSongs} instrument={instrument} onExit={() => setStageOpen(false)} />}
+
       <div className="app">
         <div className="nav-bar">
           <div className="nav-logo" onClick={() => setShowInstPicker(true)}>
