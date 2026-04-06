@@ -703,12 +703,11 @@ function CapoView() {
   const [capoFret, setCapoFret] = useState(0);
   const [findMode, setFindMode] = useState('result'); // result = given key+capo show sounding key; find = given song key show capo options
 
-  const allKeys = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   const friendlyKeys = ['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
   const easyKeys = ['C','D','E','G','A']; // beginner-friendly open chord keys
 
   // Given open chord key + capo, what key are you sounding in?
-  const soundingKey = transposeNote(songKey, -capoFret < 0 ? 12 + (-capoFret % 12) : (-capoFret + 12) % 12);
+  
   // Actually: capo raises pitch. If you play G shapes with capo 2, you sound in A.
   const soundingKeyActual = CHROMATIC[(CHROMATIC.indexOf(normalizeNote(songKey)) + capoFret) % 12];
 
@@ -886,7 +885,7 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
     transform: `translateX(calc(${-idx * 100}% + ${dragX}px))`,
     transition: isDragging.current ? 'none' : 'transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94)',
   };
-  const tc = (chord, si) => transposeChord(chord, tps[si] || 0);
+  
 
   return (
     <div className="stage-overlay">
