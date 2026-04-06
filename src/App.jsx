@@ -645,9 +645,9 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport, instr
             </div>
           ) : (
             <div>
-              <ChordReferencePanel data={data} transpose={transpose} />
-              {data.sections?.map(sec => (
-                <div key={sec.name} className="section-block">
+             <ChordReferencePanel data={data} transpose={transpose} />
+{false && data.sections?.map(sec => (
+  <div key={sec.name} className="section-block">
                   <div className="section-name">{sec.name}{sec.repeat > 1 && <span className="section-repeat">x{sec.repeat}</span>}</div>
                   {sec.lines ? sec.lines.map((line, li) => (
                     <div key={li} className="chord-line">
@@ -926,8 +926,8 @@ function StageMode({ setlistName, songs, instrument, onExit }) {
                               </div>
                             </div>
                           )}
-                          {song.data.sections?.map(sec => (
-                            <div key={sec.name} className="section-block">
+                          {false && song.data.sections?.map(sec => (
+                          <div key={sec.name} className="section-block">
                               <div className="section-name">{sec.name}{sec.repeat > 1 && <span className="section-repeat">x{sec.repeat}</span>}</div>
                               {sec.lines ? sec.lines.map((line, li) => (
                                 <div key={li} className="chord-line">
