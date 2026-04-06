@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 // ── Transpose helpers ────────────────────────────────────────────────────────
 const CHROMATIC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -27,6 +27,12 @@ function transposeKey(k, st) {
   const r = k.match(/^([A-G][#b]?)/);
   if (!r) return k;
   return transposeNote(r[1], st) + (minor ? ' minor' : '');
+}
+function semitonesBetween(from, to) {
+  const f = CHROMATIC.indexOf(normalizeNote(from));
+  const t = CHROMATIC.indexOf(normalizeNote(to));
+  if (f === -1 || t === -1) return 0;
+  return ((t - f) + 12) % 12;
 }
 
 // ── Nashville Number System ──────────────────────────────────────────────────
@@ -88,151 +94,34 @@ function buildPrompt(title, artist, instrumentId, songKey = '') {
   if (instrumentId === 'drums') {
     return `${base}
 Generate a drum roadmap for this worship song in the key of ${keyStr}.
-{
-  "title": "song title","artist": "artist name","key": "${keyStr}","bpm": 72,"timeSignature": "4/4",
-  "chordList": [{"chord": "G","function": "I"},{"chord": "C","function": "IV"}],
-  "sections": [
-    {"name": "Intro","repeat": 1,"bars": 4,"lines": [[{"chord": "—","beats": 4,"function": ""}]]},
-    {"name": "Verse","repeat": 2,"bars": 8,"lines": [[{"chord": "—","beats": 4,"function": ""}]]}
-  ],
-  "bassTab": null,
-  "drumMap": {
-    "Intro": {"feel": "soft brushes or light sticks","dynamics": "pp","notes": "establish the groove quietly"},
-    "Verse": {"feel": "hi-hat pattern, soft kick on 1 and 3","dynamics": "mp","notes": "stay light, let the vocals breathe"},
-    "Chorus": {"feel": "open hi-hat on 2 and 4, full kit","dynamics": "mf","notes": "drive with energy, crash on 1"},
-    "Bridge": {"feel": "half-time feel or build","dynamics": "f","notes": "big fill into last chorus"}
-  },
-  "bassNotes": {
-    "feel": "Overall groove and feel description for the drummer",
-    "rootNotes": "Key signature and time feel notes",
-    "dynamics": "How dynamics should build through the song",
-    "tips": ["Tip about the kick pattern","Tip about hi-hat feel","Tip about fills and transitions"]
-  }
-}`;
+{"title":"song title","artist":"artist name","key":"${keyStr}","bpm":72,"timeSignature":"4/4","chordList":[{"chord":"G","function":"I"},{"chord":"C","function":"IV"}],"sections":[{"name":"Intro","repeat":1,"bars":4,"lines":[[{"chord":"—","beats":4,"function":""}]]},{"name":"Verse","repeat":2,"bars":8,"lines":[[{"chord":"—","beats":4,"function":""}]]}],"bassTab":null,"drumMap":{"Intro":{"feel":"soft brushes or light sticks","dynamics":"pp","notes":"establish the groove quietly"},"Verse":{"feel":"hi-hat pattern, soft kick on 1 and 3","dynamics":"mp","notes":"stay light, let the vocals breathe"},"Chorus":{"feel":"open hi-hat on 2 and 4, full kit","dynamics":"mf","notes":"drive with energy, crash on 1"},"Bridge":{"feel":"half-time feel or build","dynamics":"f","notes":"big fill into last chorus"}},"bassNotes":{"feel":"Overall groove and feel description for the drummer","rootNotes":"Key signature and time feel notes","dynamics":"How dynamics should build through the song","tips":["Tip about the kick pattern","Tip about hi-hat feel","Tip about fills and transitions"]}}`;
   }
 
   if (instrumentId === 'vocals') {
     return `${base}
 Generate a vocal chart for this worship song in the key of ${keyStr}.
-{
-  "title": "song title","artist": "artist name","key": "${keyStr}","bpm": 72,"timeSignature": "4/4",
-  "chordList": [{"chord": "G","function": "I"},{"chord": "C","function": "IV"},{"chord": "D","function": "V"},{"chord": "Em","function": "vi"}],
-  "sections": [
-    {"name": "Verse","repeat": 2,"lines": [
-      [{"chord": "G","beats": 4,"function": "I","lyric": "First line of lyrics here"}],
-      [{"chord": "C","beats": 4,"function": "IV","lyric": "Second line of lyrics here"}]
-    ]},
-    {"name": "Chorus","repeat": 2,"lines": [
-      [{"chord": "G","beats": 2,"function": "I","lyric": "Chorus first line"},{"chord": "D","beats": 2,"function": "V","lyric": ""}]
-    ]}
-  ],
-  "bassTab": null,
-  "bassNotes": {
-    "feel": "Vocal style and delivery notes",
-    "rootNotes": "Range and key notes for the vocalist",
-    "dynamics": "Where to build energy and pull back",
-    "tips": ["Breathing tip","Phrasing tip","Harmony or ad-lib opportunity"]
-  }
-}`;
+{"title":"song title","artist":"artist name","key":"${keyStr}","bpm":72,"timeSignature":"4/4","chordList":[{"chord":"G","function":"I"},{"chord":"C","function":"IV"},{"chord":"D","function":"V"},{"chord":"Em","function":"vi"}],"sections":[{"name":"Verse","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I","lyric":"First line of lyrics here"}],[{"chord":"C","beats":4,"function":"IV","lyric":"Second line of lyrics here"}]]},{"name":"Chorus","repeat":2,"lines":[[{"chord":"G","beats":2,"function":"I","lyric":"Chorus first line"},{"chord":"D","beats":2,"function":"V","lyric":""}]]}],"bassTab":null,"bassNotes":{"feel":"Vocal style and delivery notes","rootNotes":"Range and key notes for the vocalist","dynamics":"Where to build energy and pull back","tips":["Breathing tip","Phrasing tip","Harmony or ad-lib opportunity"]}}`;
   }
 
   if (instrumentId === 'keys') {
     return `${base}
 Generate a keys/piano chart for this worship song in the key of ${keyStr}.
-{
-  "title": "song title","artist": "artist name","key": "${keyStr}","bpm": 72,"timeSignature": "4/4",
-  "chordList": [{"chord": "G","function": "I"},{"chord": "C","function": "IV"},{"chord": "D","function": "V"},{"chord": "Em","function": "vi"}],
-  "sections": [
-    {"name": "Verse","repeat": 2,"lines": [
-      [{"chord": "G","beats": 4,"function": "I"},{"chord": "C","beats": 4,"function": "IV"}],
-      [{"chord": "D","beats": 4,"function": "V"},{"chord": "G","beats": 4,"function": "I"}]
-    ]},
-    {"name": "Chorus","repeat": 2,"lines": [
-      [{"chord": "G","beats": 4,"function": "I"},{"chord": "D","beats": 4,"function": "V"}],
-      [{"chord": "Em","beats": 4,"function": "vi"},{"chord": "C","beats": 4,"function": "IV"}]
-    ]}
-  ],
-  "bassTab": {
-    "Verse": {"voicing": "Open voicing, root-5th-3rd, soft pads","leftHand": "Root notes only","rightHand": "Gentle arpeggios or sustained chords","description": "Lay back, support the band without cluttering"},
-    "Chorus": {"voicing": "Full chord voicings, 1st inversion on D","leftHand": "Root-fifth","rightHand": "Full chords on beat 1, arpeggiate on 2-4","description": "Fill out the sound, drive the energy"}
-  },
-  "bassNotes": {
-    "feel": "Overall keys role in the band for this song",
-    "rootNotes": "Key chord shapes and inversions to use",
-    "dynamics": "When to use pads vs full chords vs nothing",
-    "tips": ["Voicing tip","When to lay out","Pedal and tone tip"]
-  }
-}`;
+{"title":"song title","artist":"artist name","key":"${keyStr}","bpm":72,"timeSignature":"4/4","chordList":[{"chord":"G","function":"I"},{"chord":"C","function":"IV"},{"chord":"D","function":"V"},{"chord":"Em","function":"vi"}],"sections":[{"name":"Verse","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"C","beats":4,"function":"IV"}],[{"chord":"D","beats":4,"function":"V"},{"chord":"G","beats":4,"function":"I"}]]},{"name":"Chorus","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"D","beats":4,"function":"V"}],[{"chord":"Em","beats":4,"function":"vi"},{"chord":"C","beats":4,"function":"IV"}]]}],"bassTab":{"Verse":{"voicing":"Open voicing, root-5th-3rd, soft pads","leftHand":"Root notes only","rightHand":"Gentle arpeggios or sustained chords","description":"Lay back, support the band without cluttering"},"Chorus":{"voicing":"Full chord voicings, 1st inversion on D","leftHand":"Root-fifth","rightHand":"Full chords on beat 1, arpeggiate on 2-4","description":"Fill out the sound, drive the energy"}},"bassNotes":{"feel":"Overall keys role in the band for this song","rootNotes":"Key chord shapes and inversions to use","dynamics":"When to use pads vs full chords vs nothing","tips":["Voicing tip","When to lay out","Pedal and tone tip"]}}`;
   }
 
   if (instrumentId === 'acoustic' || instrumentId === 'electric') {
     const isElectric = instrumentId === 'electric';
     return `${base}
 Generate a ${isElectric ? 'electric' : 'acoustic'} guitar chart for this worship song in the key of ${keyStr}.
-{
-  "title": "song title","artist": "artist name","key": "${keyStr}","bpm": 72,"timeSignature": "4/4","capo": null,
-  "chordList": [{"chord": "G","function": "I"},{"chord": "C","function": "IV"},{"chord": "D","function": "V"},{"chord": "Em","function": "vi"}],
-  "sections": [
-    {"name": "Verse","repeat": 2,"lines": [
-      [{"chord": "G","beats": 4,"function": "I"},{"chord": "C","beats": 4,"function": "IV"}],
-      [{"chord": "D","beats": 4,"function": "V"},{"chord": "G","beats": 4,"function": "I"}]
-    ]},
-    {"name": "Chorus","repeat": 2,"lines": [
-      [{"chord": "G","beats": 4,"function": "I"},{"chord": "D","beats": 4,"function": "V"}],
-      [{"chord": "Em","beats": 4,"function": "vi"},{"chord": "C","beats": 4,"function": "IV"}]
-    ]}
-  ],
-  "bassTab": {
-    "Verse": {"G": "e|--3--|","D": "B|--3--|","A": "G|--0--|","E": "D|--0--|","description": "${isElectric ? 'Clean tone, single note fills' : 'Down strums, gentle fingerpick pattern'}"},
-    "Chorus": {"G": "e|--3--|","D": "B|--3--|","A": "G|--0--|","E": "D|--2--|","description": "${isElectric ? 'Light overdrive, full strums on 1' : 'Full strums, drive the energy'}"}
-  },
-  "bassNotes": {
-    "feel": "Overall guitar role and feel",
-    "rootNotes": "${isElectric ? 'Tone settings and pickup suggestions' : 'Capo position and open chord shapes'}",
-    "dynamics": "Strumming pattern and dynamic approach",
-    "tips": ["${isElectric ? 'Tone/effect tip' : 'Strumming pattern tip'}","Transition tip","When to simplify"]
-  }
-}`;
+{"title":"song title","artist":"artist name","key":"${keyStr}","bpm":72,"timeSignature":"4/4","capo":null,"chordList":[{"chord":"G","function":"I"},{"chord":"C","function":"IV"},{"chord":"D","function":"V"},{"chord":"Em","function":"vi"}],"sections":[{"name":"Verse","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"C","beats":4,"function":"IV"}],[{"chord":"D","beats":4,"function":"V"},{"chord":"G","beats":4,"function":"I"}]]},{"name":"Chorus","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"D","beats":4,"function":"V"}],[{"chord":"Em","beats":4,"function":"vi"},{"chord":"C","beats":4,"function":"IV"}]]}],"bassTab":{"Verse":{"G":"e|--3--|","D":"B|--3--|","A":"G|--0--|","E":"D|--0--|","description":"${isElectric ? 'Clean tone, single note fills' : 'Down strums, gentle fingerpick pattern'}"},"Chorus":{"G":"e|--3--|","D":"B|--3--|","A":"G|--0--|","E":"D|--2--|","description":"${isElectric ? 'Light overdrive, full strums on 1' : 'Full strums, drive the energy'}"}},"bassNotes":{"feel":"Overall guitar role and feel","rootNotes":"${isElectric ? 'Tone settings and pickup suggestions' : 'Capo position and open chord shapes'}","dynamics":"Strumming pattern and dynamic approach","tips":["${isElectric ? 'Tone/effect tip' : 'Strumming pattern tip'}","Transition tip","When to simplify"]}}`;
   }
 
   // Default: bass
   return `${base}
 You are generating a bass chart for "${title}" by "${artist || 'unknown'}" in the key of ${keyStr}.
-Use the actual known chord progression for this specific worship song. Be accurate — do not guess generically.
+Use the actual known chord progression for this specific worship song. Be accurate.
 Include a chordList of every unique chord used in the song.
-{
-  "title": "song title","artist": "artist name","key": "${keyStr}","bpm": 72,"timeSignature": "4/4",
-  "chordList": [
-    {"chord": "G","function": "I"},
-    {"chord": "C","function": "IV"},
-    {"chord": "D","function": "V"},
-    {"chord": "Em","function": "vi"}
-  ],
-  "sections": [
-    {"name": "Verse","repeat": 2,"lines": [
-      [{"chord": "G","beats": 4,"function": "I"},{"chord": "C","beats": 4,"function": "IV"}],
-      [{"chord": "D","beats": 4,"function": "V"},{"chord": "G","beats": 4,"function": "I"}]
-    ]},
-    {"name": "Pre-Chorus","repeat": 1,"lines": [
-      [{"chord": "Em","beats": 4,"function": "vi"},{"chord": "C","beats": 4,"function": "IV"}]
-    ]},
-    {"name": "Chorus","repeat": 2,"lines": [
-      [{"chord": "G","beats": 4,"function": "I"},{"chord": "D","beats": 4,"function": "V"}],
-      [{"chord": "Em","beats": 4,"function": "vi"},{"chord": "C","beats": 4,"function": "IV"}]
-    ]},
-    {"name": "Bridge","repeat": 1,"lines": [
-      [{"chord": "C","beats": 4,"function": "IV"},{"chord": "G","beats": 4,"function": "I"}]
-    ]}
-  ],
-  "bassTab": {
-    "Verse": {"G": "|-3--3-3--3--|","D": "|------------|","A": "|--0--0-0----|","E": "|------------|","description": "Root notes, quarter note feel"},
-    "Chorus": {"G": "|-3--3-3--3--|","D": "|-0--0-0--0--|","A": "|------------|","E": "|------------|","description": "Drive with eighth notes"}
-  },
-  "bassNotes": {
-    "feel": "groove description","rootNotes": "fretboard guidance","dynamics": "dynamics guidance",
-    "tips": ["tip 1","tip 2","tip 3"]
-  }
-}`;
+{"title":"song title","artist":"artist name","key":"${keyStr}","bpm":72,"timeSignature":"4/4","chordList":[{"chord":"G","function":"I"},{"chord":"C","function":"IV"},{"chord":"D","function":"V"},{"chord":"Em","function":"vi"}],"sections":[{"name":"Verse","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"C","beats":4,"function":"IV"}],[{"chord":"D","beats":4,"function":"V"},{"chord":"G","beats":4,"function":"I"}]]},{"name":"Pre-Chorus","repeat":1,"lines":[[{"chord":"Em","beats":4,"function":"vi"},{"chord":"C","beats":4,"function":"IV"}]]},{"name":"Chorus","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"D","beats":4,"function":"V"}],[{"chord":"Em","beats":4,"function":"vi"},{"chord":"C","beats":4,"function":"IV"}]]},{"name":"Bridge","repeat":1,"lines":[[{"chord":"C","beats":4,"function":"IV"},{"chord":"G","beats":4,"function":"I"}]]}],"bassTab":{"Verse":{"G":"|-3--3-3--3--|","D":"|------------|","A":"|--0--0-0----|","E":"|------------|","description":"Root notes, quarter note feel"},"Chorus":{"G":"|-3--3-3--3--|","D":"|-0--0-0--0--|","A":"|------------|","E":"|------------|","description":"Drive with eighth notes"}},"bassNotes":{"feel":"groove description","rootNotes":"fretboard guidance","dynamics":"dynamics guidance","tips":["tip 1","tip 2","tip 3"]}}`;
 }
 
 // ── AI chart fetch ───────────────────────────────────────────────────────────
@@ -243,7 +132,7 @@ async function fetchChart(title, artist, instrumentId = 'bass', songKey = '') {
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1800,
-      system: 'You are an expert worship musician and music director. You know bass, guitar, keys, drums, and vocals inside out. Return ONLY valid JSON. No markdown, no backticks, no explanation.',
+      system: 'You are an expert worship musician and music director. Return ONLY valid JSON. No markdown, no backticks, no explanation.',
       messages: [{ role: 'user', content: buildPrompt(title, artist, instrumentId, songKey) }]
     })
   });
@@ -267,7 +156,6 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// ── Quick suggests ───────────────────────────────────────────────────────────
 const SUGGESTIONS = [
   { title: 'Way Maker', artist: 'Sinach' },
   { title: 'Goodness of God', artist: 'Bethel Music' },
@@ -280,12 +168,14 @@ const SUGGESTIONS = [
 ];
 
 // ── CSS ──────────────────────────────────────────────────────────────────────
-const styles = `
+function getStyles(theme) {
+  const isDark = theme === 'dark';
+  return `
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #0f0f0f; --bg2: #1a1a1a; --bg3: #242424; --bg4: #2e2e2e;
-  --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.15);
-  --text: #f0ede8; --text2: #8a8680; --text3: #555250;
+  --bg: ${isDark ? '#0f0f0f' : '#f5f4f2'}; --bg2: ${isDark ? '#1a1a1a' : '#ffffff'}; --bg3: ${isDark ? '#242424' : '#ebebea'}; --bg4: ${isDark ? '#2e2e2e' : '#dededc'};
+  --border: ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}; --border2: ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.2)'};
+  --text: ${isDark ? '#f0ede8' : '#1a1a1a'}; --text2: ${isDark ? '#8a8680' : '#5a5850'}; --text3: ${isDark ? '#555250' : '#9a9890'};
   --accent: #e8c170; --accent-bg: rgba(232,193,112,0.12);
   --blue: #5b9cf6; --blue-bg: rgba(91,156,246,0.12);
   --green: #6bcb8b; --green-bg: rgba(107,203,139,0.12);
@@ -300,14 +190,14 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .ob-logo { width: 72px; height: 72px; background: var(--accent); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; animation: iconPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.2s both; }
 .ob-logo svg { width: 38px; height: 38px; fill: #0f0f0f; }
 .ob-title { font-size: 32px; font-weight: 700; letter-spacing: 6px; color: var(--text); margin-bottom: 4px; animation: fadeUp 0.4s ease 0.5s both; }
-.ob-sub { font-size: 11px; color: rgba(255,255,255,0.25); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 40px; animation: fadeUp 0.4s ease 0.65s both; }
+.ob-sub { font-size: 11px; color: var(--text3); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 40px; animation: fadeUp 0.4s ease 0.65s both; }
 .ob-question { font-size: 16px; font-weight: 500; color: var(--text); margin-bottom: 20px; text-align: center; animation: fadeUp 0.4s ease 0.75s both; }
 .ob-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 380px; animation: fadeUp 0.4s ease 0.85s both; }
 .ob-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 20px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
 .ob-card:active { transform: scale(0.96); }
 .ob-card-emoji { font-size: 28px; line-height: 1; }
 .ob-card-label { font-size: 13px; font-weight: 500; color: var(--text2); text-align: center; }
-.ob-fuse { font-size: 10px; color: rgba(255,255,255,0.15); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 32px; animation: fadeUp 0.4s ease 1s both; }
+.ob-fuse { font-size: 10px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 32px; animation: fadeUp 0.4s ease 1s both; }
 .inst-sheet-overlay { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,0.7); display: flex; align-items: flex-end; justify-content: center; animation: fadeIn 0.2s ease; }
 .inst-sheet { background: var(--bg2); border-radius: 16px 16px 0 0; border-top: 1px solid var(--border); padding: 20px 16px; padding-bottom: calc(20px + env(safe-area-inset-bottom)); width: 100%; max-width: 640px; animation: slideUp 0.25s ease; }
 .inst-sheet-handle { width: 36px; height: 4px; background: var(--border2); border-radius: 2px; margin: 0 auto 16px; }
@@ -319,13 +209,15 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .inst-card-emoji { font-size: 22px; line-height: 1; }
 .inst-card-label { font-size: 11px; font-weight: 500; color: var(--text2); text-align: center; line-height: 1.3; }
 .inst-card.selected .inst-card-label { color: var(--text); font-weight: 600; }
-.nav-bar { position: sticky; top: 0; z-index: 50; background: rgba(15,15,15,0.95); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); padding: 0 12px; display: flex; align-items: center; }
+.nav-bar { position: sticky; top: 0; z-index: 50; background: ${isDark ? 'rgba(15,15,15,0.95)' : 'rgba(245,244,242,0.95)'}; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); padding: 0 12px; display: flex; align-items: center; }
 .nav-logo { display: flex; align-items: center; gap: 7px; padding: 11px 0; margin-right: 6px; flex-shrink: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .logo-icon { width: 27px; height: 27px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
 .logo-icon svg { width: 14px; height: 14px; fill: #0f0f0f; }
 .nav-inst-badge { display: flex; align-items: center; gap: 4px; padding: 3px 7px; background: var(--bg3); border: 1px solid var(--border); border-radius: 99px; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: border-color 0.15s; }
 .nav-inst-emoji { font-size: 12px; line-height: 1; }
 .nav-inst-label { font-size: 10px; font-weight: 500; color: var(--text2); white-space: nowrap; }
+.theme-toggle { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 4px; -webkit-tap-highlight-color: transparent; transition: all 0.15s; }
+.theme-toggle:active { transform: scale(0.9); }
 .nav-tabs { display: flex; flex: 1; overflow-x: auto; scrollbar-width: none; margin-left: 6px; }
 .nav-tabs::-webkit-scrollbar { display: none; }
 .nav-tab { flex-shrink: 0; padding: 13px 7px; font-size: 11px; font-weight: 500; text-align: center; color: var(--text3); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-family: var(--font); transition: color 0.15s, border-color 0.15s; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
@@ -361,6 +253,7 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 @keyframes fadeUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
 @keyframes iconPop { from { opacity:0; transform: scale(0.5); } to { opacity:1; transform: scale(1); } }
 @keyframes splashFade { 0%{opacity:1;} 80%{opacity:1;} 100%{opacity:0;} }
+@keyframes tapPulse { 0%{transform:scale(1);} 50%{transform:scale(0.94);} 100%{transform:scale(1);} }
 .song-card-header { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .song-title { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
 .song-artist { font-size: 12px; color: var(--text2); margin-top: 2px; }
@@ -419,9 +312,11 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .tip-list { list-style: none; }
 .tip-list li { font-size: 14px; color: var(--text2); line-height: 1.65; padding-left: 16px; position: relative; margin-bottom: 3px; }
 .tip-list li::before { content: '→'; position: absolute; left: 0; color: var(--accent); font-size: 12px; }
-.transport { position: fixed; bottom: 0; z-index: 40; left: 50%; transform: translateX(-50%); width: 100%; max-width: 640px; background: rgba(15,15,15,0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-top: 1px solid var(--border); padding: 9px 16px; padding-bottom: calc(9px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 9px; }
+.transport { position: fixed; bottom: 0; z-index: 40; left: 50%; transform: translateX(-50%); width: 100%; max-width: 640px; background: ${isDark ? 'rgba(15,15,15,0.96)' : 'rgba(245,244,242,0.96)'}; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-top: 1px solid var(--border); padding: 9px 16px; padding-bottom: calc(9px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 9px; }
 .transport-btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg3); color: var(--text); font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.12s; flex-shrink: 0; -webkit-tap-highlight-color: transparent; }
 .transport-btn.play-btn { background: var(--accent); border-color: var(--accent); color: #0f0f0f; font-size: 15px; }
+.transport-btn.tap-btn { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); font-size: 11px; font-weight: 700; font-family: var(--mono); width: auto; padding: 0 10px; border-radius: var(--radius-sm); }
+.transport-btn.tap-btn:active { animation: tapPulse 0.15s ease; }
 .transport-btn:active { transform: scale(0.92); }
 .transport-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
 .bpm-group { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
@@ -471,6 +366,12 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
 .item-load-btn { padding: 4px 9px; font-size: 11px; font-family: var(--font); font-weight: 500; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text2); cursor: pointer; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
 .item-del { color: var(--text3); font-size: 17px; padding: 2px 4px; border: none; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
+.item-note-btn { color: var(--text3); font-size: 14px; padding: 2px 4px; border: none; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; flex-shrink: 0; transition: color 0.15s; }
+.item-note-btn.has-note { color: var(--accent); }
+.note-area { padding: 8px 11px; border-top: 1px solid var(--border); background: var(--bg3); }
+.note-textarea { width: 100%; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 13px; color: var(--text); font-family: var(--font); outline: none; resize: none; min-height: 60px; transition: border-color 0.15s; }
+.note-textarea:focus { border-color: var(--accent); }
+.note-textarea::placeholder { color: var(--text3); }
 .setlist-footer { display: flex; gap: 7px; flex-wrap: wrap; }
 .stage-btn { flex: 1; padding: 13px 18px; background: var(--accent); color: #0f0f0f; font-family: var(--font); font-size: 15px; font-weight: 700; border: none; border-radius: var(--radius); cursor: pointer; transition: opacity 0.15s, transform 0.1s; -webkit-tap-highlight-color: transparent; }
 .stage-btn:active { transform: scale(0.97); }
@@ -524,8 +425,26 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .pdf-close { padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: none; color: var(--text2); font-size: 12px; font-family: var(--font); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .pdf-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
 .pdf-open-btn { margin-top: 14px; padding: 14px 28px; background: var(--purple); color: #0f0f0f; font-family: var(--font); font-size: 15px; font-weight: 700; border: none; border-radius: var(--radius); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.capo-view { padding: 14px 16px; }
+.capo-section { margin-bottom: 22px; }
+.capo-section-title { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); margin-bottom: 10px; }
+.capo-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+.capo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.capo-row:last-child { margin-bottom: 0; }
+.capo-label { font-size: 12px; font-weight: 500; color: var(--text2); min-width: 90px; }
+.capo-select { flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 14px; color: var(--text); font-family: var(--font); outline: none; -webkit-appearance: none; appearance: none; }
+.capo-result { background: var(--accent-bg); border: 1px solid var(--accent); border-radius: var(--radius); padding: 14px; margin-top: 10px; text-align: center; }
+.capo-result-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.capo-result-key { font-family: var(--mono); font-size: 32px; font-weight: 700; color: var(--accent); }
+.capo-result-sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.capo-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.capo-table th { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text3); padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+.capo-table td { font-size: 13px; color: var(--text); padding: 7px 8px; border-bottom: 1px solid var(--border); font-family: var(--mono); }
+.capo-table tr:last-child td { border-bottom: none; }
+.capo-table td:first-child { color: var(--text2); font-size: 12px; }
+.capo-table tr.highlight td { color: var(--accent); font-weight: 700; }
 .stage-overlay { position: fixed; inset: 0; z-index: 200; background: var(--bg); display: flex; flex-direction: column; max-width: 640px; margin: 0 auto; }
-.stage-topbar { background: rgba(15,15,15,0.96); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.stage-topbar { background: ${isDark ? 'rgba(15,15,15,0.96)' : 'rgba(245,244,242,0.96)'}; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 .stage-setlist-name { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); }
 .stage-counter { font-family: var(--mono); font-size: 12px; color: var(--text3); margin-top: 1px; }
 .stage-exit-btn { padding: 5px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: none; color: var(--text2); font-size: 12px; font-family: var(--font); cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -536,7 +455,7 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .swipe-hint { text-align: center; font-size: 11px; color: var(--text3); padding: 4px 0 8px; flex-shrink: 0; }
 .stage-body { flex: 1; overflow: hidden; position: relative; }
 .stage-track { display: flex; height: 100%; will-change: transform; }
-.stage-panel { flex: 0 0 100%; height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 16px 110px; }
+.stage-panel { flex: 0 0 100%; height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 16px 130px; }
 .stage-song-title { font-size: 21px; font-weight: 700; letter-spacing: -0.5px; }
 .stage-song-artist { font-size: 13px; color: var(--text2); margin-top: 2px; margin-bottom: 10px; }
 .stage-transposer { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 7px 11px; background: var(--bg2); border-radius: var(--radius-sm); border: 1px solid var(--border); }
@@ -548,7 +467,7 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .stage-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
 .stage-tab { padding: 5px 12px; font-size: 12px; font-weight: 500; border: 1px solid var(--border); border-radius: 99px; background: none; color: var(--text3); font-family: var(--font); cursor: pointer; transition: all 0.12s; -webkit-tap-highlight-color: transparent; }
 .stage-tab.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
-.stage-nav { position: fixed; bottom: 0; z-index: 201; left: 50%; transform: translateX(-50%); width: 100%; max-width: 640px; background: rgba(15,15,15,0.97); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--border); padding: 10px 16px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 10px; }
+.stage-nav { position: fixed; bottom: 0; z-index: 201; left: 50%; transform: translateX(-50%); width: 100%; max-width: 640px; background: ${isDark ? 'rgba(15,15,15,0.97)' : 'rgba(245,244,242,0.97)'}; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--border); padding: 10px 16px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 10px; }
 .snav-btn { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg3); color: var(--text2); font-family: var(--font); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; min-width: 75px; }
 .snav-btn:active { background: var(--bg4); }
 .snav-btn:disabled { opacity: 0.25; cursor: not-allowed; }
@@ -556,7 +475,31 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .stage-cur { text-align: center; flex: 0; min-width: 0; }
 .stage-cur-title { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
 .stage-cur-key { font-family: var(--mono); font-size: 11px; color: var(--accent); margin-top: 1px; }
+.stage-note-box { margin-top: 12px; padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); border-left: 3px solid var(--accent); }
+.stage-note-label { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
+.stage-note-text { font-size: 13px; color: var(--text2); line-height: 1.6; white-space: pre-wrap; }
 `;
+}
+
+// ── Tap Tempo Hook ───────────────────────────────────────────────────────────
+function useTapTempo(onBpmChange) {
+  const tapsRef = useRef([]);
+  const tap = useCallback(() => {
+    const now = Date.now();
+    tapsRef.current = tapsRef.current.filter(t => now - t < 3000);
+    tapsRef.current.push(now);
+    if (tapsRef.current.length >= 2) {
+      const intervals = [];
+      for (let i = 1; i < tapsRef.current.length; i++) {
+        intervals.push(tapsRef.current[i] - tapsRef.current[i-1]);
+      }
+      const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      const bpm = Math.round(60000 / avg);
+      if (bpm >= 40 && bpm <= 220) onBpmChange(bpm);
+    }
+  }, [onBpmChange]);
+  return tap;
+}
 
 // ── Chart Content ────────────────────────────────────────────────────────────
 function ChartContent({ data, transpose, onTransposeChange, showTransport, instrument }) {
@@ -567,6 +510,8 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport, instr
   const [curIdx, setCurIdx] = useState(0);
   const playRef = useRef(null);
   const allRef = useRef([]);
+  const handleBpmChange = useCallback((v) => setBpm(v), []);
+  const tapTempo = useTapTempo(handleBpmChange);
 
   useEffect(() => {
     if (!data) return;
@@ -644,42 +589,7 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport, instr
               })}
             </div>
           ) : (
-            <div>
-             <ChordReferencePanel data={data} transpose={transpose} />
-{false && data.sections?.map(sec => (
-  <div key={sec.name} className="section-block">
-                  <div className="section-name">{sec.name}{sec.repeat > 1 && <span className="section-repeat">x{sec.repeat}</span>}</div>
-                  {sec.lines ? sec.lines.map((line, li) => (
-                    <div key={li} className="chord-line">
-                      {line.map((c, i) => {
-                        const on = isPlaying && cur?.section === sec.name && cur?.lineIdx === li && cur?.idx === i;
-                        return (
-                          <div key={i} className={`chord-cell${on ? ' playing' : ''}`}>
-                            <div className="chord-name">{tc(c.chord)}</div>
-                            <div className="chord-beats">{c.beats}b</div>
-                            {c.function && !isDrums && <div className="chord-func">{romanToNashville(c.function)}</div>}
-                            {isVocals && c.lyric && <div className="chord-lyric">{c.lyric}</div>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )) : (
-                    <div className="chord-grid">
-                      {sec.chords?.map((c, i) => {
-                        const on = isPlaying && cur?.section === sec.name && cur?.idx === i;
-                        return (
-                          <div key={i} className={`chord-cell${on ? ' playing' : ''}`}>
-                            <div className="chord-name">{tc(c.chord)}</div>
-                            <div className="chord-beats">{c.beats}b</div>
-                            {c.function && <div className="chord-func">{romanToNashville(c.function)}</div>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <div><ChordReferencePanel data={data} transpose={transpose} /></div>
           )
         )}
         {activeTab === 'tab' && showTab && (
@@ -729,6 +639,7 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport, instr
             <div className="bpm-row"><span className="bpm-label">Tempo</span><span className="bpm-number">♩ {bpm}</span></div>
             <input type="range" min="40" max="200" step="1" value={bpm} className="bpm-slider" onChange={e => setBpm(parseInt(e.target.value))} />
           </div>
+          <button className="transport-btn tap-btn" onClick={tapTempo}>TAP</button>
           {isPlaying && cur && (
             <div className="playhead-display">
               <div style={{ color:'var(--accent)', fontWeight:700, fontSize:14 }}>{tc(cur.chord)}</div>
@@ -786,8 +697,138 @@ function Onboarding({ onSelect }) {
   );
 }
 
+// ── Capo Calculator View ─────────────────────────────────────────────────────
+function CapoView() {
+  const [songKey, setSongKey] = useState('C');
+  const [capoFret, setCapoFret] = useState(0);
+  const [findMode, setFindMode] = useState('result'); // result = given key+capo show sounding key; find = given song key show capo options
+
+  const allKeys = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const friendlyKeys = ['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+  const easyKeys = ['C','D','E','G','A']; // beginner-friendly open chord keys
+
+  // Given open chord key + capo, what key are you sounding in?
+  const soundingKey = transposeNote(songKey, -capoFret < 0 ? 12 + (-capoFret % 12) : (-capoFret + 12) % 12);
+  // Actually: capo raises pitch. If you play G shapes with capo 2, you sound in A.
+  const soundingKeyActual = CHROMATIC[(CHROMATIC.indexOf(normalizeNote(songKey)) + capoFret) % 12];
+
+  // Given a target song key, show capo options for each easy key
+  const capoOptions = easyKeys.map(openKey => {
+    const st = semitonesBetween(openKey, songKey);
+    return { openKey, capo: st, sounding: songKey };
+  }).filter(o => o.capo >= 0 && o.capo <= 7);
+
+  return (
+    <div className="capo-view">
+      <div style={{ marginBottom:16 }}>
+        <div style={{ fontSize:18, fontWeight:700, color:'var(--text)', marginBottom:4 }}>Capo Calculator</div>
+        <div style={{ fontSize:13, color:'var(--text2)' }}>Find the right capo position for any key.</div>
+      </div>
+
+      <div style={{ display:'flex', gap:6, marginBottom:16 }}>
+        <button onClick={() => setFindMode('result')} style={{ flex:1, padding:'8px', borderRadius:'var(--radius-sm)', border:`1px solid ${findMode==='result' ? 'var(--accent)' : 'var(--border)'}`, background: findMode==='result' ? 'var(--accent-bg)' : 'var(--bg3)', color: findMode==='result' ? 'var(--accent)' : 'var(--text2)', fontFamily:'var(--font)', fontSize:12, fontWeight:500, cursor:'pointer' }}>
+          Key → Sounding key
+        </button>
+        <button onClick={() => setFindMode('find')} style={{ flex:1, padding:'8px', borderRadius:'var(--radius-sm)', border:`1px solid ${findMode==='find' ? 'var(--accent)' : 'var(--border)'}`, background: findMode==='find' ? 'var(--accent-bg)' : 'var(--bg3)', color: findMode==='find' ? 'var(--accent)' : 'var(--text2)', fontFamily:'var(--font)', fontSize:12, fontWeight:500, cursor:'pointer' }}>
+          Song key → Capo options
+        </button>
+      </div>
+
+      {findMode === 'result' && (
+        <div className="capo-section">
+          <div className="capo-section-title">What key am I playing in?</div>
+          <div className="capo-card">
+            <div className="capo-row">
+              <span className="capo-label">Open chord key</span>
+              <select className="capo-select" value={songKey} onChange={e => setSongKey(e.target.value)}>
+                {friendlyKeys.map(k => <option key={k} value={normalizeNote(k)}>{k}</option>)}
+              </select>
+            </div>
+            <div className="capo-row">
+              <span className="capo-label">Capo fret</span>
+              <select className="capo-select" value={capoFret} onChange={e => setCapoFret(parseInt(e.target.value))}>
+                {[0,1,2,3,4,5,6,7,8,9,10,11].map(f => <option key={f} value={f}>{f === 0 ? 'No capo' : `Fret ${f}`}</option>)}
+              </select>
+            </div>
+            <div className="capo-result">
+              <div className="capo-result-label">Sounding key</div>
+              <div className="capo-result-key">{soundingKeyActual}</div>
+              <div className="capo-result-sub">{capoFret === 0 ? `Playing open in ${songKey}` : `Playing ${songKey} shapes with capo ${capoFret} → sounds in ${soundingKeyActual}`}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {findMode === 'find' && (
+        <div className="capo-section">
+          <div className="capo-section-title">Song key capo options</div>
+          <div className="capo-card">
+            <div className="capo-row">
+              <span className="capo-label">Song key</span>
+              <select className="capo-select" value={songKey} onChange={e => setSongKey(e.target.value)}>
+                {friendlyKeys.map(k => <option key={k} value={normalizeNote(k)}>{k}</option>)}
+              </select>
+            </div>
+          </div>
+          {capoOptions.length > 0 ? (
+            <div style={{ marginTop:10 }}>
+              <table className="capo-table">
+                <thead>
+                  <tr>
+                    <th>Open chord shapes</th>
+                    <th>Capo fret</th>
+                    <th>Sounds in</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {capoOptions.map(o => (
+                    <tr key={o.openKey} className={o.capo === 0 ? 'highlight' : ''}>
+                      <td>{o.openKey}</td>
+                      <td>{o.capo === 0 ? 'No capo' : `Fret ${o.capo}`}</td>
+                      <td>{o.sounding}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ fontSize:12, color:'var(--text3)', marginTop:10, lineHeight:1.5 }}>
+                Pick the option with the most comfortable open chord shapes. Lower capo = more resonance.
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize:13, color:'var(--text3)', marginTop:10 }}>No standard capo options found for this key. Try a partial capo or alternate tuning.</div>
+          )}
+        </div>
+      )}
+
+      <div className="capo-section">
+        <div className="capo-section-title">Quick reference</div>
+        <div className="capo-card">
+          <div style={{ fontSize:12, color:'var(--text2)', marginBottom:10, lineHeight:1.6 }}>
+            Common worship key conversions using G or C shapes:
+          </div>
+          <table className="capo-table">
+            <thead><tr><th>Song key</th><th>Capo</th><th>Play shapes in</th></tr></thead>
+            <tbody>
+              {[
+                ['Bb','3','G'],['Bb','1','A'],
+                ['Ab','1','G'],['Ab','4','E'],
+                ['Eb','3','C'],['Eb','6','A'],
+                ['F','5','C'],['F','3','D'],
+                ['B','4','G'],['B','2','A'],
+                ['Db','4','A'],['Db','1','C'],
+              ].map(([key,capo,shapes]) => (
+                <tr key={key+capo}><td>{key}</td><td>Fret {capo}</td><td>{shapes}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Stage Mode ───────────────────────────────────────────────────────────────
-function StageMode({ setlistName, songs, instrument, onExit }) {
+function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
   const inst = getInstrument(instrument);
   const [idx, setIdx] = useState(0);
   const [tps, setTps] = useState(() => songs.map(() => 0));
@@ -868,6 +909,7 @@ function StageMode({ setlistName, songs, instrument, onExit }) {
             const sTab = tabs[si] || 'chart';
             const showTab = !isDrums && inst.id !== 'vocals';
             const stc = c => transposeChord(c, s);
+            const note = songNotes?.[song.title] || '';
             return (
               <div key={si} className="stage-panel">
                 <div className="stage-song-title">{song.title}</div>
@@ -926,32 +968,6 @@ function StageMode({ setlistName, songs, instrument, onExit }) {
                               </div>
                             </div>
                           )}
-                          {false && song.data.sections?.map(sec => (
-                          <div key={sec.name} className="section-block">
-                              <div className="section-name">{sec.name}{sec.repeat > 1 && <span className="section-repeat">x{sec.repeat}</span>}</div>
-                              {sec.lines ? sec.lines.map((line, li) => (
-                                <div key={li} className="chord-line">
-                                  {line.map((c, i) => (
-                                    <div key={i} className="chord-cell">
-                                      <div className="chord-name">{tc(c.chord, si)}</div>
-                                      <div className="chord-beats">{c.beats}b</div>
-                                      {c.function && <div className="chord-func">{romanToNashville(c.function)}</div>}
-                                    </div>
-                                  ))}
-                                </div>
-                              )) : (
-                                <div className="chord-grid">
-                                  {sec.chords?.map((c, i) => (
-                                    <div key={i} className="chord-cell">
-                                      <div className="chord-name">{tc(c.chord, si)}</div>
-                                      <div className="chord-beats">{c.beats}b</div>
-                                      {c.function && <div className="chord-func">{romanToNashville(c.function)}</div>}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
                         </>
                       )
                     )}
@@ -980,12 +996,24 @@ function StageMode({ setlistName, songs, instrument, onExit }) {
                         ))
                       )
                     )}
-                    {sTab === 'notes' && song.data.bassNotes && (
+                    {sTab === 'notes' && (
                       <>
-                        {song.data.bassNotes.feel && <div className="notes-section"><div className="notes-heading">Feel & groove</div><div className="notes-body">{song.data.bassNotes.feel}</div></div>}
-                        {song.data.bassNotes.rootNotes && <div className="notes-section"><div className="notes-heading">{isDrums ? 'Time feel' : 'Root notes'}</div><div className="notes-body">{song.data.bassNotes.rootNotes}</div></div>}
-                        {song.data.bassNotes.dynamics && <div className="notes-section"><div className="notes-heading">Dynamics</div><div className="notes-body">{song.data.bassNotes.dynamics}</div></div>}
-                        {song.data.bassNotes.tips?.length > 0 && <div className="notes-section"><div className="notes-heading">Tips</div><ul className="tip-list">{song.data.bassNotes.tips.map((t, i) => <li key={i}>{t}</li>)}</ul></div>}
+                        {note ? (
+                          <div className="stage-note-box">
+                            <div className="stage-note-label">My notes</div>
+                            <div className="stage-note-text">{note}</div>
+                          </div>
+                        ) : (
+                          <div style={{ color:'var(--text3)', fontSize:13, padding:'12px 0' }}>No personal notes for this song. Add them in the Setlist tab.</div>
+                        )}
+                        {song.data.bassNotes && (
+                          <>
+                            {song.data.bassNotes.feel && <div className="notes-section" style={{ marginTop:14 }}><div className="notes-heading">Feel & groove</div><div className="notes-body">{song.data.bassNotes.feel}</div></div>}
+                            {song.data.bassNotes.rootNotes && <div className="notes-section"><div className="notes-heading">{isDrums ? 'Time feel' : 'Root notes'}</div><div className="notes-body">{song.data.bassNotes.rootNotes}</div></div>}
+                            {song.data.bassNotes.dynamics && <div className="notes-section"><div className="notes-heading">Dynamics</div><div className="notes-body">{song.data.bassNotes.dynamics}</div></div>}
+                            {song.data.bassNotes.tips?.length > 0 && <div className="notes-section"><div className="notes-heading">Tips</div><ul className="tip-list">{song.data.bassNotes.tips.map((t, i) => <li key={i}>{t}</li>)}</ul></div>}
+                          </>
+                        )}
                       </>
                     )}
                   </>
@@ -1027,7 +1055,7 @@ function PDFViewer({ song, url, onClose }) {
             </a>
           </div>
         ) : (
-          <div className="pdf-loading" style={{ textAlign:'center' }}>
+          <div style={{ textAlign:'center', color:'var(--text2)', fontSize:14 }}>
             {!url ? <><div className="loading-spinner" style={{ margin:'0 auto 12px' }} /><div>Loading chord chart…</div></> : 'No PDF chart found for this song.'}
           </div>
         )}
@@ -1084,9 +1112,8 @@ function ServicesView({ onAddToSetlist }) {
       enriched.sort((a, b) => new Date(a.date) - new Date(b.date));
       try { localStorage.setItem('selah-synced-plans', JSON.stringify({ plans: enriched, syncedAt: Date.now() })); } catch {}
       setMyPlans(enriched); setHasLoaded(true);
-    } catch (e) {
-      setError('Could not connect to Planning Center. ' + e.message);
-    } finally { setSyncing(false); }
+    } catch (e) { setError('Could not connect to Planning Center. ' + e.message); }
+    finally { setSyncing(false); }
   }
 
   async function loadPlanSongs(plan) {
@@ -1131,12 +1158,8 @@ function ServicesView({ onAddToSetlist }) {
         const meta = urlData.meta||{};
         const url = attrs.file_download_url||attrs.open_url||attrs.url||meta.file_download_url||meta.open_url||meta.url;
         setPdfViewer({ song, url: url || 'none' });
-      } else {
-        setPdfViewer({ song, url: 'none' });
-      }
-    } catch (e) {
-      setPdfViewer({ song, url: 'error' });
-    }
+      } else { setPdfViewer({ song, url: 'none' }); }
+    } catch { setPdfViewer({ song, url: 'error' }); }
   }
 
   function togglePlan(plan) {
@@ -1152,31 +1175,16 @@ function ServicesView({ onAddToSetlist }) {
   return (
     <div className="pco-view">
       <div className="pco-header">
-        <div>
-          <div className="pco-title">Planning Center</div>
-          <div className="pco-subtitle">Your upcoming scheduled services</div>
-        </div>
+        <div><div className="pco-title">Planning Center</div><div className="pco-subtitle">Your upcoming scheduled services</div></div>
         <button className="sync-btn" onClick={syncPlans} disabled={syncing}>
           <span className={`sync-icon${syncing ? ' spinning' : ''}`}>↻</span>
           {syncing ? 'Syncing…' : 'Sync'}
         </button>
       </div>
       {error && <div className="error-card" style={{ marginBottom:12 }}>{error}</div>}
-      {!hasLoaded && !syncing && (
-        <div className="empty-state">
-          <div className="empty-icon">📅</div>
-          <div className="empty-title">Connect to Planning Center</div>
-          <div className="empty-sub">Tap Sync to pull your upcoming scheduled services.</div>
-        </div>
-      )}
+      {!hasLoaded && !syncing && <div className="empty-state"><div className="empty-icon">📅</div><div className="empty-title">Connect to Planning Center</div><div className="empty-sub">Tap Sync to pull your upcoming scheduled services.</div></div>}
       {syncing && <div className="loading-screen"><div className="loading-spinner" /><div className="loading-text">Connecting to Planning Center…</div></div>}
-      {hasLoaded && !syncing && myPlans.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-icon">🎵</div>
-          <div className="empty-title">No upcoming services found</div>
-          <div className="empty-sub">You don't appear to be scheduled for any upcoming services yet.</div>
-        </div>
-      )}
+      {hasLoaded && !syncing && myPlans.length === 0 && <div className="empty-state"><div className="empty-icon">🎵</div><div className="empty-title">No upcoming services found</div><div className="empty-sub">You don't appear to be scheduled for any upcoming services yet.</div></div>}
       {hasLoaded && myPlans.map(plan => {
         const dp = getDateParts(plan.date);
         const isExpanded = expandedPlan === plan.id;
@@ -1184,10 +1192,7 @@ function ServicesView({ onAddToSetlist }) {
         return (
           <div key={plan.id} className={`service-card${isExpanded ? ' expanded' : ''}`} onClick={() => togglePlan(plan)}>
             <div className="service-card-header">
-              <div className="service-date-badge">
-                <div className="service-date-day">{dp.day}</div>
-                <div className="service-date-month">{dp.month}</div>
-              </div>
+              <div className="service-date-badge"><div className="service-date-day">{dp.day}</div><div className="service-date-month">{dp.month}</div></div>
               <div className="service-info">
                 <div className="service-name">{plan.serviceName}</div>
                 <div className="service-meta">{dp.full}</div>
@@ -1229,6 +1234,7 @@ function ServicesView({ onAddToSetlist }) {
 
 // ── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
+  const [theme, setTheme] = useState(() => { try { return localStorage.getItem('selah-theme') || 'dark'; } catch { return 'dark'; } });
   const [instrument, setInstrument] = useState(() => { try { return localStorage.getItem('selah-instrument') || null; } catch { return null; } });
   const [showInstPicker, setShowInstPicker] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
@@ -1245,6 +1251,8 @@ export default function App() {
   const [addArtist, setAddArtist] = useState('');
   const [setlistSongs, setSetlistSongs] = useState(() => { try { return JSON.parse(localStorage.getItem('bass-active-setlist') || '[]'); } catch { return []; } });
   const [savedSetlists, setSavedSetlists] = useState(() => { try { return JSON.parse(localStorage.getItem('bass-setlists') || '[]'); } catch { return []; } });
+  const [songNotes, setSongNotes] = useState(() => { try { return JSON.parse(localStorage.getItem('selah-song-notes') || '{}'); } catch { return {}; } });
+  const [expandedNoteIdx, setExpandedNoteIdx] = useState(null);
   const [stageOpen, setStageOpen] = useState(false);
   const dragIdx = useRef(null);
   const dragOverIdx = useRef(null);
@@ -1257,16 +1265,23 @@ export default function App() {
   const [touchOverIdx, setTouchOverIdx] = useState(null);
 
   useEffect(() => { const t = setTimeout(() => setShowSplash(false), 2400); return () => clearTimeout(t); }, []);
+  useEffect(() => { try { localStorage.setItem('selah-theme', theme); } catch {} }, [theme]);
   useEffect(() => { try { localStorage.setItem('selah-instrument', instrument || ''); } catch {} }, [instrument]);
   useEffect(() => { try { localStorage.setItem('bass-library', JSON.stringify(library)); } catch {} }, [library]);
   useEffect(() => { try { localStorage.setItem('bass-setlists', JSON.stringify(savedSetlists)); } catch {} }, [savedSetlists]);
   useEffect(() => { try { localStorage.setItem('bass-active-setlist', JSON.stringify(setlistSongs)); } catch {} }, [setlistSongs]);
   useEffect(() => { try { localStorage.setItem('bass-active-setlist-name', setlistName); } catch {} }, [setlistName]);
+  useEffect(() => { try { localStorage.setItem('selah-song-notes', JSON.stringify(songNotes)); } catch {} }, [songNotes]);
 
   const inst = getInstrument(instrument || 'bass');
   const isInLibrary = songData ? library.some(s => s.title === songData.title && s.artist === songData.artist) : false;
 
+  function toggleTheme() { setTheme(t => t === 'dark' ? 'light' : 'dark'); }
   function selectInstrument(id) { setInstrument(id); setSongData(null); }
+
+  function updateSongNote(title, note) {
+    setSongNotes(p => ({ ...p, [title]: note }));
+  }
 
   async function doSearch(title, artist) {
     if (!title.trim()) return;
@@ -1290,17 +1305,10 @@ export default function App() {
     setSetlistSongs(p => {
       if (p.some(s => s.title === pcoSong.title)) return p;
       return [...p, {
-        title: pcoSong.title,
-        artist: pcoSong.artist || '',
-        status: 'pending',
-        data: null,
-        pcoKey: pcoSong.key || '',
-        planName: planName || '',
-        itemId: pcoSong.itemId || '',
-        songId: pcoSong.songId || '',
-        arrangementId: pcoSong.arrangementId || '',
-        serviceTypeId: pcoSong.serviceTypeId || '',
-        planId: pcoSong.planId || '',
+        title: pcoSong.title, artist: pcoSong.artist || '', status: 'pending', data: null,
+        pcoKey: pcoSong.key || '', planName: planName || '',
+        itemId: pcoSong.itemId || '', songId: pcoSong.songId || '',
+        arrangementId: pcoSong.arrangementId || '', serviceTypeId: pcoSong.serviceTypeId || '', planId: pcoSong.planId || '',
       }];
     });
     setView('setlist');
@@ -1354,7 +1362,6 @@ export default function App() {
     setSetlistSongs(p => { const arr=[...p]; const [moved]=arr.splice(dragIdx.current,1); arr.splice(i,0,moved); return arr; });
     dragIdx.current = null; dragOverIdx.current = null; setDraggingIdx(null); setDragOverVisual(null);
   }
-
   function onTouchHandleStart(e, i) { e.preventDefault(); touchDragIdx.current = i; touchStartY.current = e.touches[0].clientY; setTouchDragActive(true); setTouchOverIdx(i); }
   function onTouchHandleMove(e) {
     if (touchDragIdx.current === null) return; e.preventDefault();
@@ -1374,12 +1381,12 @@ export default function App() {
   const loadedCount = setlistSongs.filter(s => s.status === 'loaded').length;
 
   if (!instrument && !showSplash) {
-    return (<><style>{styles}</style><Onboarding onSelect={selectInstrument} /></>);
+    return (<><style>{getStyles(theme)}</style><Onboarding onSelect={selectInstrument} /></>);
   }
 
   return (
     <>
-      <style>{styles}</style>
+      <style>{getStyles(theme)}</style>
       {showSplash && (
         <div style={{ position:'fixed', inset:0, background:'#0C0B0A', zIndex:9999, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, animation:'splashFade 2.4s ease forwards', fontFamily:"'Sora',sans-serif" }}>
           <div style={{ width:68, height:68, background:'#e8c170', borderRadius:18, display:'flex', alignItems:'center', justifyContent:'center', animation:'iconPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.2s both' }}>
@@ -1390,7 +1397,8 @@ export default function App() {
         </div>
       )}
       {showInstPicker && <InstrumentPicker current={instrument} onSelect={selectInstrument} onClose={() => setShowInstPicker(false)} />}
-      {stageOpen && <StageMode setlistName={setlistName} songs={setlistSongs} instrument={instrument} onExit={() => setStageOpen(false)} />}
+      {stageOpen && <StageMode setlistName={setlistName} songs={setlistSongs} instrument={instrument} onExit={() => setStageOpen(false)} songNotes={songNotes} />}
+
       <div className="app">
         <div className="nav-bar">
           <div className="nav-logo" onClick={() => setShowInstPicker(true)}>
@@ -1405,12 +1413,17 @@ export default function App() {
           <div className="nav-tabs">
             <button className={`nav-tab${view==='services'?' active':''}`} onClick={() => setView('services')}>Services</button>
             <button className={`nav-tab${view==='search'?' active':''}`} onClick={() => setView('search')}>Search</button>
+            <button className={`nav-tab${view==='capo'?' active':''}`} onClick={() => setView('capo')}>Capo</button>
             <button className={`nav-tab${view==='library'?' active':''}`} onClick={() => setView('library')}>Library{library.length > 0 ? ` (${library.length})` : ''}</button>
             <button className={`nav-tab${view==='setlist'?' active':''}`} onClick={() => setView('setlist')}>Setlist{setlistSongs.length > 0 ? ` (${setlistSongs.length})` : ''}</button>
           </div>
+          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </div>
 
         {view === 'services' && <ServicesView onAddToSetlist={addToSetlistFromPCO} />}
+        {view === 'capo' && <CapoView />}
 
         {view === 'search' && (
           <>
@@ -1504,23 +1517,39 @@ export default function App() {
                 {setlistSongs.map((song, i) => {
                   const isDragging = draggingIdx === i;
                   const isOver = (dragOverVisual === i || touchOverIdx === i) && !isDragging;
+                  const hasNote = !!(songNotes[song.title]);
+                  const noteExpanded = expandedNoteIdx === i;
                   return (
-                    <div key={i} data-setlist-idx={i} className={`setlist-item ${song.status}`} draggable onDragStart={() => onDragStart(i)} onDragOver={e=>onDragOver(e,i)} onDragEnd={onDragEnd} onDrop={() => onDrop(i)}
-                      style={{ opacity:isDragging?0.4:1, borderColor:isOver?'var(--accent)':undefined, transform:isOver?'scale(1.01)':'scale(1)', transition:'opacity 0.15s, transform 0.15s' }}>
-                      <div className="item-drag-handle" onTouchStart={e=>onTouchHandleStart(e,i)} style={{ cursor:touchDragActive?'grabbing':'grab' }}>☰</div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:1, flexShrink:0 }}>
-                        <button onClick={() => { if(i===0)return; setSetlistSongs(p=>{const a=[...p];[a[i-1],a[i]]=[a[i],a[i-1]];return a;}); }} disabled={i===0} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:10, cursor:'pointer', padding:'1px 3px', lineHeight:1, opacity:i===0?0.2:1 }}>▲</button>
-                        <button onClick={() => { if(i===setlistSongs.length-1)return; setSetlistSongs(p=>{const a=[...p];[a[i],a[i+1]]=[a[i+1],a[i]];return a;}); }} disabled={i===setlistSongs.length-1} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:10, cursor:'pointer', padding:'1px 3px', lineHeight:1, opacity:i===setlistSongs.length-1?0.2:1 }}>▼</button>
+                    <div key={i} data-setlist-idx={i} className={`setlist-item ${song.status}`} style={{ flexDirection:'column', alignItems:'stretch', opacity:isDragging?0.4:1, borderColor:isOver?'var(--accent)':undefined, transform:isOver?'scale(1.01)':'scale(1)', transition:'opacity 0.15s, transform 0.15s' }}
+                      draggable onDragStart={() => onDragStart(i)} onDragOver={e=>onDragOver(e,i)} onDragEnd={onDragEnd} onDrop={() => onDrop(i)}>
+                      <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+                        <div className="item-drag-handle" onTouchStart={e=>onTouchHandleStart(e,i)} style={{ cursor:touchDragActive?'grabbing':'grab' }}>☰</div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:1, flexShrink:0 }}>
+                          <button onClick={() => { if(i===0)return; setSetlistSongs(p=>{const a=[...p];[a[i-1],a[i]]=[a[i],a[i-1]];return a;}); }} disabled={i===0} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:10, cursor:'pointer', padding:'1px 3px', lineHeight:1, opacity:i===0?0.2:1 }}>▲</button>
+                          <button onClick={() => { if(i===setlistSongs.length-1)return; setSetlistSongs(p=>{const a=[...p];[a[i],a[i+1]]=[a[i+1],a[i]];return a;}); }} disabled={i===setlistSongs.length-1} style={{ background:'none', border:'none', color:'var(--text3)', fontSize:10, cursor:'pointer', padding:'1px 3px', lineHeight:1, opacity:i===setlistSongs.length-1?0.2:1 }}>▼</button>
+                        </div>
+                        <div className="item-num">{i+1}</div>
+                        <div className="item-info">
+                          <div className="item-title">{song.title}</div>
+                          <div className="item-sub">{song.artist||'—'}{song.data?` · ${song.data.key} · ♩${song.data.bpm}`:song.pcoKey?` · Key: ${song.pcoKey} (PCO)`:''}</div>
+                          {song.status==='error'&&<div style={{fontSize:11,color:'var(--red)',marginTop:1}}>Load failed</div>}
+                        </div>
+                        <div className={`status-dot ${song.status==='loaded'?'loaded':song.status==='loading'?'loading':song.status==='error'?'error':'pending'}`} />
+                        {(song.status==='pending'||song.status==='error')&&<button className="item-load-btn" onClick={()=>loadSongAt(i)}>{song.status==='error'?'Retry':'Load'}</button>}
+                        <button className={`item-note-btn${hasNote?' has-note':''}`} onClick={() => setExpandedNoteIdx(noteExpanded ? null : i)} title="Add note">✏️</button>
+                        <button className="item-del" onClick={()=>removeSong(i)}>×</button>
                       </div>
-                      <div className="item-num">{i+1}</div>
-                      <div className="item-info">
-                        <div className="item-title">{song.title}</div>
-                        <div className="item-sub">{song.artist||'—'}{song.data?` · ${song.data.key} · ♩${song.data.bpm}`:song.pcoKey?` · Key: ${song.pcoKey} (PCO)`:''}</div>
-                        {song.status==='error'&&<div style={{fontSize:11,color:'var(--red)',marginTop:1}}>Load failed</div>}
-                      </div>
-                      <div className={`status-dot ${song.status==='loaded'?'loaded':song.status==='loading'?'loading':song.status==='error'?'error':'pending'}`} />
-                      {(song.status==='pending'||song.status==='error')&&<button className="item-load-btn" onClick={()=>loadSongAt(i)}>{song.status==='error'?'Retry':'Load'}</button>}
-                      <button className="item-del" onClick={()=>removeSong(i)}>×</button>
+                      {noteExpanded && (
+                        <div className="note-area">
+                          <textarea
+                            className="note-textarea"
+                            placeholder="Add your notes for this song… (e.g. watch the tag on bridge, hold V chord before chorus)"
+                            value={songNotes[song.title] || ''}
+                            onChange={e => updateSongNote(song.title, e.target.value)}
+                            rows={3}
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1561,13 +1590,13 @@ export default function App() {
           </div>
         )}
 
-        <div style={{ borderTop:'1px solid rgba(255,255,255,0.06)', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
-          <div style={{ width:16, height:16, background:'#1a1a1a', border:'1px solid rgba(255,255,255,0.12)', borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="rgba(255,255,255,0.4)"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 3a1 1 0 0 1 1 1v6.17A3 3 0 1 1 9 16V7a1 1 0 0 1 1-1h2zm-2 11a1 1 0 1 0 2 0 1 1 0 0 0-2 0z"/></svg>
+        <div style={{ borderTop:'1px solid var(--border)', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
+          <div style={{ width:16, height:16, background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--text3)"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 3a1 1 0 0 1 1 1v6.17A3 3 0 1 1 9 16V7a1 1 0 0 1 1-1h2zm-2 11a1 1 0 1 0 2 0 1 1 0 0 0-2 0z"/></svg>
           </div>
-          <span style={{ fontFamily:"'Sora',sans-serif", fontSize:10, color:'rgba(255,255,255,0.2)', letterSpacing:'0.1em', textTransform:'uppercase' }}>Fuse Apps</span>
-          <span style={{ fontSize:10, color:'rgba(255,255,255,0.1)' }}>·</span>
-          <span style={{ fontFamily:"'Sora',sans-serif", fontSize:10, color:'rgba(255,255,255,0.15)', letterSpacing:'0.05em' }}>by TNT Labs</span>
+          <span style={{ fontFamily:"'Sora',sans-serif", fontSize:10, color:'var(--text3)', letterSpacing:'0.1em', textTransform:'uppercase' }}>Fuse Apps</span>
+          <span style={{ fontSize:10, color:'var(--text3)' }}>·</span>
+          <span style={{ fontFamily:"'Sora',sans-serif", fontSize:10, color:'var(--text3)', letterSpacing:'0.05em' }}>by TNT Labs</span>
         </div>
       </div>
     </>
