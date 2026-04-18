@@ -1,15 +1,15 @@
 const PCO_BASE = 'https://api.planningcenteronline.com';
 
-function getAuthHeader() {
-  const id = process.env.PCO_APP_ID;
-  const secret = process.env.PCO_SECRET;
+function getAuthHeader(query) {
+  const id = query?.pcoAppId || process.env.PCO_APP_ID;
+  const secret = query?.pcoSecret || process.env.PCO_SECRET;
   return 'Basic ' + Buffer.from(`${id}:${secret}`).toString('base64');
 }
 
-async function pcoFetch(path) {
+async function pcoFetch(path, query) {
   const response = await fetch(`${PCO_BASE}${path}`, {
     headers: {
-      'Authorization': getAuthHeader(),
+      'Authorization': getAuthHeader(query),
       'Content-Type': 'application/json',
     },
   });
@@ -29,23 +29,25 @@ export default async function handler(req, res) {
 
   try {
     if (action === 'me') {
-      const data = await pcoFetch('/services/v2/me');
+      const data = await pcoFetch('/services/v2/me', req.query);
       return res.status(200).json(data);
     }
 
     if (action === 'myPlans') {
-      const me = await pcoFetch('/services/v2/me');
+      const me = await pcoFetch('/services/v2/me', req.query);
       const personId = me?.data?.id;
       if (!personId) throw new Error('Could not get person ID');
       const data = await pcoFetch(
-        `/services/v2/people/${personId}/plan_people?filter=future&order=sort_date&per_page=20&include=plan,service_type`
+        `/services/v2/people/${personId}/plan_people?filter=future&order=sort_date&per_page=20&include=plan,service_type`,
+        req.query
       );
       return res.status(200).json(data);
     }
 
     if (action === 'planItems' && serviceTypeId && planId) {
       const data = await pcoFetch(
-        `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items?include=song,arrangement,key&per_page=25`
+        `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items?include=song,arrangement,key&per_page=25`,
+        req.query
       );
       return res.status(200).json(data);
     }
@@ -56,47 +58,34 @@ export default async function handler(req, res) {
       if (planItemId) {
         try {
           const r = await pcoFetch(
-            `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments?per_page=50`
+            `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments?per_page=50`,
+            req.query
           );
           results.itemAttachments = r.data || [];
-          console.log('ITEM atts:', results.itemAttachments.length, JSON.stringify(results.itemAttachments.map(a => a.attributes?.filename)));
-        } catch (e) {
-          results.itemAttachments = [];
-        }
-      } else {
-        results.itemAttachments = [];
-      }
+        } catch (e) { results.itemAttachments = []; }
+      } else { results.itemAttachments = []; }
 
       try {
         const r = await pcoFetch(
-          `/services/v2/service_types/${serviceTypeId}/plans/${planId}/attachments?per_page=50`
+          `/services/v2/service_types/${serviceTypeId}/plans/${planId}/attachments?per_page=50`,
+          req.query
         );
         results.planAttachments = r.data || [];
-      } catch (e) {
-        results.planAttachments = [];
-      }
+      } catch (e) { results.planAttachments = []; }
 
       if (songId) {
         try {
-          const r = await pcoFetch(`/services/v2/songs/${songId}/attachments?per_page=50`);
+          const r = await pcoFetch(`/services/v2/songs/${songId}/attachments?per_page=50`, req.query);
           results.songAttachments = r.data || [];
-        } catch (e) {
-          results.songAttachments = [];
-        }
-      } else {
-        results.songAttachments = [];
-      }
+        } catch (e) { results.songAttachments = []; }
+      } else { results.songAttachments = []; }
 
       if (songId && arrangementId) {
         try {
-          const r = await pcoFetch(`/services/v2/songs/${songId}/arrangements/${arrangementId}/attachments?per_page=50`);
+          const r = await pcoFetch(`/services/v2/songs/${songId}/arrangements/${arrangementId}/attachments?per_page=50`, req.query);
           results.arrangementAttachments = r.data || [];
-        } catch (e) {
-          results.arrangementAttachments = [];
-        }
-      } else {
-        results.arrangementAttachments = [];
-      }
+        } catch (e) { results.arrangementAttachments = []; }
+      } else { results.arrangementAttachments = []; }
 
       return res.status(200).json(results);
     }
@@ -105,14 +94,11 @@ export default async function handler(req, res) {
       if (serviceTypeId && planId && planItemId) {
         try {
           const data = await pcoFetch(
-            `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments/${attachmentId}`
+            `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments/${attachmentId}`,
+            req.query
           );
-          const attrs = data?.data?.attributes || {};
-          console.log('ATTACHMENT_DIRECT:', JSON.stringify(attrs));
           return res.status(200).json(data);
-        } catch (e) {
-          console.log('ATTACHMENT_DIRECT failed:', e.message);
-        }
+        } catch (e) {}
       }
       return res.status(404).json({ error: 'Could not get attachment URL' });
     }
