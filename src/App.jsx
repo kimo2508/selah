@@ -143,8 +143,16 @@ async function fetchChart(title, artist, instrumentId = 'bass', songKey = '') {
 }
 
 // ── Planning Center API ──────────────────────────────────────────────────────
+function getPcoCredentials() {
+  try { const s = localStorage.getItem('selah-pco-credentials'); if (s) return JSON.parse(s); } catch {}
+  return null;
+}
+
 async function pcoGet(action, params = {}) {
-  const query = new URLSearchParams({ action, ...params }).toString();
+  const creds = getPcoCredentials();
+  const allParams = { action, ...params };
+  if (creds) { allParams.pcoAppId = creds.appId; allParams.pcoSecret = creds.secret; }
+  const query = new URLSearchParams(allParams).toString();
   const resp = await fetch(`/api/planning-center?${query}`);
   if (!resp.ok) throw new Error(`PCO error ${resp.status}`);
   return resp.json();
@@ -1064,6 +1072,48 @@ function PDFViewer({ song, url, onClose }) {
 }
 
 // ── Services View ────────────────────────────────────────────────────────────
+function PCOSetup({ onSave }) {
+  const [appId, setAppId] = useState('');
+  const [secret, setSecret] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [err, setErr] = useState('');
+  async function testAndSave() {
+    if (!appId.trim() || !secret.trim()) return;
+    setTesting(true); setErr('');
+    try {
+      const q = new URLSearchParams({ action: 'me', pcoAppId: appId.trim(), pcoSecret: secret.trim() }).toString();
+      const r = await fetch(`/api/planning-center?${q}`);
+      if (!r.ok) throw new Error('Invalid');
+      const d = await r.json();
+      localStorage.setItem('selah-pco-credentials', JSON.stringify({ appId: appId.trim(), secret: secret.trim() }));
+      localStorage.setItem('selah-pco-name', d.data?.attributes?.first_name || 'User');
+      onSave();
+    } catch { setErr('Invalid credentials. Check your App ID and Secret.'); }
+    finally { setTesting(false); }
+  }
+  return (
+    <div style={{ padding:'20px 16px', textAlign:'center' }}>
+      <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:'var(--radius)', padding:'20px 16px', maxWidth:400, margin:'0 auto' }}>
+        <div style={{ fontSize:16, fontWeight:600, marginBottom:8 }}>Connect Planning Center</div>
+        <div style={{ fontSize:13, color:'var(--text2)', marginBottom:16, lineHeight:1.5 }}>
+          Go to <a href="https://api.planningcenteronline.com/oauth/applications" target="_blank" rel="noopener noreferrer" style={{ color:'var(--purple)' }}>api.planningcenteronline.com</a> → <strong>Personal Access Tokens</strong> → Create one. Paste your App ID and Secret below.
+        </div>
+        <div style={{ marginBottom:10, textAlign:'left' }}>
+          <div style={{ fontSize:10, fontWeight:600, letterSpacing:'0.8px', textTransform:'uppercase', color:'var(--text3)', marginBottom:4 }}>Application ID</div>
+          <input className="text-input" type="text" placeholder="Paste App ID" value={appId} onChange={e => setAppId(e.target.value)} />
+        </div>
+        <div style={{ marginBottom:10, textAlign:'left' }}>
+          <div style={{ fontSize:10, fontWeight:600, letterSpacing:'0.8px', textTransform:'uppercase', color:'var(--text3)', marginBottom:4 }}>Secret</div>
+          <input className="text-input" type="password" placeholder="Paste Secret" value={secret} onChange={e => setSecret(e.target.value)} />
+        </div>
+        {err && <div style={{ color:'var(--red)', fontSize:13, marginBottom:10 }}>{err}</div>}
+        <button className="btn-primary" style={{ width:'100%' }} onClick={testAndSave} disabled={testing || !appId.trim() || !secret.trim()}>
+          {testing ? 'Connecting…' : 'Connect'}
+        </button>
+      </div>
+    </div>
+  );
+}
 function ServicesView({ onAddToSetlist }) {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
@@ -1073,7 +1123,7 @@ function ServicesView({ onAddToSetlist }) {
   const [loadingSongs, setLoadingSongs] = useState({});
   const [pdfViewer, setPdfViewer] = useState(null);
   const [hasLoaded, setHasLoaded] = useState(false);
-
+  const [hasCreds, setHasCreds] = useState(!!getPcoCredentials());
   useEffect(() => {
     try {
       const saved = localStorage.getItem('selah-synced-plans');
@@ -1170,7 +1220,8 @@ function ServicesView({ onAddToSetlist }) {
     const d = new Date(dateStr);
     return { day: d.getDate(), month: d.toLocaleString('en-US', { month: 'short' }).toUpperCase(), full: formatDate(dateStr) };
   };
-
+  if (!hasCreds) return <PCOSetup onSave={() => setHasCreds(true)} />;
+  
   return (
     <div className="pco-view">
       <div className="pco-header">
