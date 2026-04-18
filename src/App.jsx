@@ -948,15 +948,11 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
                         {!pdfUrls[song.title] && <div style={{ textAlign:'center', padding:'30px 0' }}><div className="loading-spinner" /><div style={{ fontSize:13, color:'var(--text3)' }}>Loading chord chart…</div></div>}
                         {pdfUrls[song.title] === 'none' && <div style={{ textAlign:'center', padding:'30px 0', color:'var(--text3)', fontSize:13 }}>No PDF chord chart found.</div>}
                         {pdfUrls[song.title] && pdfUrls[song.title] !== 'none' && (
-                          <div>
-                            <div style={{ width:'100%', height:'60vh', borderRadius:'var(--radius-sm)', overflow:'hidden', border:'1px solid var(--border)', background:'#fff' }}>
-                              <iframe src={`/api/pdf-proxy?url=${encodeURIComponent(pdfUrls[song.title])}`} title={song.title} style={{ width:'100%', height:'100%', border:'none' }} />
-                            </div>
-                            <div style={{ textAlign:'center', marginTop:10 }}>
-                              <a href={pdfUrls[song.title]} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none' }}>
-                                <button style={{ padding:'10px 20px', background:'var(--purple)', color:'#0f0f0f', fontFamily:'var(--font)', fontSize:13, fontWeight:700, border:'none', borderRadius:'var(--radius)', cursor:'pointer' }}>Open in Browser ↗</button>
-                              </a>
-                            </div>
+                          <div style={{ textAlign:'center', padding:'30px 0' }}>
+                            <div style={{ fontSize:14, color:'var(--text2)', marginBottom:16 }}>Chord chart ready</div>
+                            <a href={pdfUrls[song.title]} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none' }}>
+                              <button style={{ padding:'16px 32px', background:'var(--purple)', color:'#0f0f0f', fontFamily:'var(--font)', fontSize:16, fontWeight:700, border:'none', borderRadius:'var(--radius)', cursor:'pointer' }}>Open Chord Chart ↗</button>
+                            </a>
                           </div>
                         )}
                       </div>
