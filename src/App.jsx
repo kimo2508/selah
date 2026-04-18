@@ -1136,14 +1136,15 @@ function ServicesView({ onAddToSetlist }) {
   const [hasUser, setHasUser] = useState(!!getSelectedUser());
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('selah-synced-plans');
+      const user = getSelectedUser();
+const saved = localStorage.getItem('selah-synced-plans-' + (user?.personId || 'default'));
       if (saved) {
         const { plans } = JSON.parse(saved);
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const future = plans.filter(p => p.date && new Date(p.date) >= today);
         if (future.length > 0) {
           setMyPlans(future); setHasLoaded(true);
-          try { localStorage.setItem('selah-synced-plans', JSON.stringify({ plans: future, syncedAt: Date.now() })); } catch {}
+          try { localStorage.setItem('selah-synced-plans' + (user?.personId || 'default'), JSON.stringify({ plans: future, syncedAt: Date.now() })); } catch {}
         }
       }
     } catch {}
@@ -1170,7 +1171,7 @@ function ServicesView({ onAddToSetlist }) {
         enriched.push({ id: planRel.id, serviceTypeId: st?.id || stRel?.id, serviceName: st?.attributes?.name || 'Service', date: plan?.attributes?.sort_date, title: plan?.attributes?.title || '' });
       });
       enriched.sort((a, b) => new Date(a.date) - new Date(b.date));
-      try { localStorage.setItem('selah-synced-plans', JSON.stringify({ plans: enriched, syncedAt: Date.now() })); } catch {}
+      try { localStorage.setItem('selah-synced-plans' + (user2?.personId || 'default'), JSON.stringify({ plans: enriched, syncedAt: Date.now() })); } catch {}
       setMyPlans(enriched); setHasLoaded(true);
     } catch (e) { setError('Could not connect to Planning Center. ' + e.message); }
     finally { setSyncing(false); }
