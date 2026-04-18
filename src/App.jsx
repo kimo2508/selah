@@ -878,35 +878,6 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function openChartForSong(song) {
-    if (!song.itemId && !song.songId) return;
-    const win = window.open('', '_blank');
-    if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">Loading chord chart…</p>');
-    try {
-      const data = await pcoGet('attachments', { serviceTypeId: song.serviceTypeId || '', planId: song.planId || '', planItemId: song.itemId || '', songId: song.songId || '', arrangementId: song.arrangementId || '' });
-      const allAtts = [...(data.planAttachments||[]),...(data.itemAttachments||[]),...(data.songAttachments||[]),...(data.arrangementAttachments||[])];
-      const isPDF = a => { const fn=(a.attributes?.filename||'').toLowerCase(); const ct=(a.attributes?.content_type||'').toLowerCase(); return fn.endsWith('.pdf')||ct==='application/pdf'; };
-      const titleWords = song.title.toLowerCase().split(/\s+/).filter(w=>w.length>1);
-      const pdfs = allAtts.filter(a=>isPDF(a));
-      let pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return fn.includes('chart')&&titleWords.some(w=>fn.includes(w));});
-      if (!pdf) pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return fn.includes('songselect')&&titleWords.some(w=>fn.includes(w));});
-      if (!pdf) pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return titleWords.some(w=>fn.includes(w))&&!fn.includes('lyric')&&!fn.includes('words')&&!fn.includes('vocal');});
-      if (!pdf) pdf = pdfs[0];
-      if (pdf) {
-        const urlData = await pcoGet('attachmentUrl', { serviceTypeId: song.serviceTypeId||'', planId: song.planId||'', planItemId: song.itemId||'', attachmentId: pdf.id, songId: song.songId||'', arrangementId: song.arrangementId||'' });
-        const attrs = urlData.data?.attributes||urlData.attributes||{};
-        const meta = urlData.meta||{};
-        const url = attrs.file_download_url||attrs.open_url||attrs.url||meta.file_download_url||meta.open_url||meta.url;
-        if (url && win) win.location.href = url;
-        else if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">No chart found.</p>');
-      } else {
-        if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:#555">No chart found.</p>');
-      }
-    } catch(e) {
-      if (win) win.document.write('<p style="font-family:sans-serif;padding:20px;color:red">Error loading chart.</p>');
-    }
-  }
-
   function goTo(i) { if (i >= 0 && i < total) { setIdx(i); setDragX(0); } }
   function onTouchStart(e) { touchStartX.current = e.touches[0].clientX; isDragging.current = true; }
   function onTouchMove(e) { if (!isDragging.current) return; setDragX(e.touches[0].clientX - touchStartX.current); }
@@ -943,7 +914,6 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
             const sKey = song.data ? transposeKey(song.data.key || '', s) : '';
             const sTab = tabs[si] || 'chart';
             const showTab = !isDrums && inst.id !== 'vocals';
-            const stc = c => transposeChord(c, s);
             const note = songNotes?.[song.title] || '';
             return (
               <div key={si} className="stage-panel">
