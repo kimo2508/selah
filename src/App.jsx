@@ -1171,6 +1171,7 @@ const saved = localStorage.getItem('selah-synced-plans-' + (user?.personId || 'd
         enriched.push({ id: planRel.id, serviceTypeId: st?.id || stRel?.id, serviceName: st?.attributes?.name || 'Service', date: plan?.attributes?.sort_date, title: plan?.attributes?.title || '' });
       });
       enriched.sort((a, b) => new Date(a.date) - new Date(b.date));
+      const user2 = getSelectedUser();
       try { localStorage.setItem('selah-synced-plans' + (user2?.personId || 'default'), JSON.stringify({ plans: enriched, syncedAt: Date.now() })); } catch {}
       setMyPlans(enriched); setHasLoaded(true);
     } catch (e) { setError('Could not connect to Planning Center. ' + e.message); }
