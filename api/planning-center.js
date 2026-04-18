@@ -40,7 +40,8 @@ export default async function handler(req, res) {
 
     if (action === 'searchPerson') {
       const { firstName, lastName } = req.query;
-      const data = await pcoFetch(`/services/v2/people?where[first_name]=${encodeURIComponent(firstName)}&where[last_name]=${encodeURIComponent(lastName)}`, req.query);
+      const fullName = (firstName || '') + ' ' + (lastName || '');
+      const data = await pcoFetch(`/services/v2/people?where[name_like]=${encodeURIComponent(fullName.trim())}&per_page=5`, req.query);
       return res.status(200).json(data);
     }
 
