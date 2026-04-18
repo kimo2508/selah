@@ -38,6 +38,12 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
+    if (action === 'searchPerson') {
+      const { firstName, lastName } = req.query;
+      const data = await pcoFetch(`/services/v2/people?where[first_name]=${encodeURIComponent(firstName)}&where[last_name]=${encodeURIComponent(lastName)}`, req.query);
+      return res.status(200).json(data);
+    }
+
     if (action === 'myPlans') {
       let pid = personId;
       if (!pid) {
