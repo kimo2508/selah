@@ -62,6 +62,26 @@ const INSTRUMENTS = [
   { id: 'vocals',   label: 'Vocals',          emoji: '🎤', color: '#f0a070', tabLabel: 'Lyrics',     notesLabel: 'Player Notes' },
 ];
 function getInstrument(id) { return INSTRUMENTS.find(i => i.id === id) || INSTRUMENTS[0]; }
+async function fetchPdfUrlForSong(song) {
+  try {
+    const data = await pcoGet('attachments', { serviceTypeId: song.serviceTypeId || '', planId: song.planId || '', planItemId: song.itemId || '', songId: song.songId || '', arrangementId: song.arrangementId || '' });
+    const allAtts = [...(data.planAttachments||[]),...(data.itemAttachments||[]),...(data.songAttachments||[]),...(data.arrangementAttachments||[])];
+    const isPDF = a => { const fn=(a.attributes?.filename||'').toLowerCase(); const ct=(a.attributes?.content_type||'').toLowerCase(); return fn.endsWith('.pdf')||ct==='application/pdf'; };
+    const titleWords = song.title.toLowerCase().split(/\s+/).filter(w=>w.length>1);
+    const pdfs = allAtts.filter(a=>isPDF(a));
+    let pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return fn.includes('chart')&&titleWords.some(w=>fn.includes(w));});
+    if (!pdf) pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return fn.includes('songselect')&&titleWords.some(w=>fn.includes(w));});
+    if (!pdf) pdf = pdfs.find(a=>{const fn=(a.attributes?.filename||'').toLowerCase();return titleWords.some(w=>fn.includes(w))&&!fn.includes('lyric')&&!fn.includes('words')&&!fn.includes('vocal');});
+    if (!pdf) pdf = pdfs[0];
+    if (pdf) {
+      const urlData = await pcoGet('attachmentUrl', { serviceTypeId: song.serviceTypeId||'', planId: song.planId||'', planItemId: song.itemId||'', attachmentId: pdf.id, songId: song.songId||'', arrangementId: song.arrangementId||'' });
+      const attrs = urlData.data?.attributes||urlData.attributes||{};
+      const meta = urlData.meta||{};
+      return attrs.file_download_url||attrs.open_url||attrs.url||meta.file_download_url||meta.open_url||meta.url||null;
+    }
+  } catch {}
+  return null;
+}
 
 // ── Chord Reference Panel ────────────────────────────────────────────────────
 function ChordReferencePanel({ data, transpose }) {
@@ -837,6 +857,7 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
   const [idx, setIdx] = useState(0);
   const [tps, setTps] = useState(() => songs.map(() => 0));
   const [tabs, setTabs] = useState(() => songs.map(() => 'chart'));
+  const [pdfUrls, setPdfUrls] = useState({});
   const touchStartX = useRef(null);
   const [dragX, setDragX] = useState(0);
   const isDragging = useRef(false);
@@ -846,6 +867,16 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
   const st = tps[idx] || 0;
   const tKey = cur?.data ? transposeKey(cur.data.key || '', st) : '';
   const isDrums = inst.id === 'drums';
+  // Pre-fetch all PDF URLs on mount
+  useEffect(() => {
+    songs.forEach(song => {
+      if (song.itemId) {
+        fetchPdfUrlForSong(song).then(url => {
+          setPdfUrls(p => ({ ...p, [song.title]: url || 'none' }));
+        });
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function openChartForSong(song) {
     if (!song.itemId && !song.songId) return;
@@ -938,42 +969,30 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
                       {s !== 0 && <button className="stage-t-reset" onClick={() => setTps(p => { const n=[...p]; n[si]=0; return n; })}>reset</button>}
                     </div>
                     <div className="stage-tabs">
-                      <button className={`stage-tab${sTab==='chart'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='chart'; return n; })}>{isDrums ? 'Map' : 'Chords'}</button>
-                      {showTab && <button className={`stage-tab${sTab==='tab'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='tab'; return n; })}>{inst.tabLabel}</button>}
+                      {song.itemId && <button className={`stage-tab${sTab==='chart'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='chart'; return n; })}>📄 Chart</button>}
+                      <button className={`stage-tab${sTab==='numbers'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='numbers'; return n; })}>Numbers</button>
                       <button className={`stage-tab${sTab==='notes'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='notes'; return n; })}>Notes</button>
-                      {song.itemId && <button className="stage-tab" onClick={() => openChartForSong(song)} style={{ borderColor:'var(--purple)', color:'var(--purple)' }}>📄 Chart</button>}
                     </div>
-                    {sTab === 'chart' && (
-                      isDrums ? (
-                        song.data.sections?.map(sec => {
-                          const dm = song.data.drumMap?.[sec.name];
-                          return (
-                            <div key={sec.name} className="drum-section-block">
-                              <div className="drum-section-header">
-                                <div className="drum-section-name">{sec.name}{sec.repeat > 1 && <span className="section-repeat" style={{ marginLeft:6 }}>x{sec.repeat}</span>}</div>
-                                {dm?.dynamics && <span className="drum-pill">{dm.dynamics}</span>}
-                              </div>
-                              {dm && <><div className="drum-feel">{dm.feel}</div>{dm.notes && <div className="drum-notes">{dm.notes}</div>}</>}
+                    {sTab === 'chart' && song.itemId && (
+                      <div>
+                        {!pdfUrls[song.title] && <div style={{ textAlign:'center', padding:'30px 0' }}><div className="loading-spinner" /><div style={{ fontSize:13, color:'var(--text3)' }}>Loading chord chart…</div></div>}
+                        {pdfUrls[song.title] === 'none' && <div style={{ textAlign:'center', padding:'30px 0', color:'var(--text3)', fontSize:13 }}>No PDF chord chart found.</div>}
+                        {pdfUrls[song.title] && pdfUrls[song.title] !== 'none' && (
+                          <div>
+                            <div style={{ width:'100%', height:'60vh', borderRadius:'var(--radius-sm)', overflow:'hidden', border:'1px solid var(--border)', background:'#fff' }}>
+                              <iframe src={`/api/pdf-proxy?url=${encodeURIComponent(pdfUrls[song.title])}`} title={song.title} style={{ width:'100%', height:'100%', border:'none' }} />
                             </div>
-                          );
-                        })
-                      ) : (
-                        <>
-                          {song.data.chordList?.length > 0 && (
-                            <div style={{ marginBottom:14, padding:'10px 12px', background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)' }}>
-                              <div style={{ fontSize:10, fontWeight:600, letterSpacing:1, textTransform:'uppercase', color:'var(--text3)', marginBottom:8 }}>Chord Reference · Key of {sKey}</div>
-                              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                                {song.data.chordList.map((c, ci) => (
-                                  <div key={ci} style={{ display:'flex', flexDirection:'column', alignItems:'center', minWidth:48, padding:'7px 6px', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)' }}>
-                                    <div style={{ fontFamily:'var(--mono)', fontSize:16, fontWeight:700, color:'var(--text)' }}>{stc(c.chord)}</div>
-                                    <div style={{ fontFamily:'var(--mono)', fontSize:11, fontWeight:700, color:'var(--accent)', marginTop:3, background:'var(--accent-bg)', padding:'1px 5px', borderRadius:3 }}>{romanToNashville(c.function)}</div>
-                                  </div>
-                                ))}
-                              </div>
+                            <div style={{ textAlign:'center', marginTop:10 }}>
+                              <a href={pdfUrls[song.title]} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none' }}>
+                                <button style={{ padding:'10px 20px', background:'var(--purple)', color:'#0f0f0f', fontFamily:'var(--font)', fontSize:13, fontWeight:700, border:'none', borderRadius:'var(--radius)', cursor:'pointer' }}>Open in Browser ↗</button>
+                              </a>
                             </div>
-                          )}
-                        </>
-                      )
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {sTab === 'numbers' && song.data?.chordList?.length > 0 && (
+                      <ChordReferencePanel data={song.data} transpose={s} />
                     )}
                     {sTab === 'tab' && showTab && (
                       inst.id === 'keys' ? (
