@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     }
 
     if (action === 'teamMembers') {
-      const data = await pcoFetch('/services/v2/people?per_page=100&order=last_name', req.query);
+      const data = await pcoFetch('/services/v2/people?per_page=100&order=last_name&where[status]=active', req.query);
       return res.status(200).json(data);
     }
 
