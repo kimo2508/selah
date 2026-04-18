@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { action, serviceTypeId, planId, planItemId, attachmentId, songId, arrangementId } = req.query;
+  const { action, serviceTypeId, planId, planItemId, attachmentId, songId, arrangementId, personId } = req.query;
 
   try {
     if (action === 'me') {
@@ -33,12 +33,20 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
+    if (action === 'teamMembers') {
+      const data = await pcoFetch('/services/v2/people?per_page=100&order=last_name', req.query);
+      return res.status(200).json(data);
+    }
+
     if (action === 'myPlans') {
-      const me = await pcoFetch('/services/v2/me', req.query);
-      const personId = me?.data?.id;
-      if (!personId) throw new Error('Could not get person ID');
+      let pid = personId;
+      if (!pid) {
+        const me = await pcoFetch('/services/v2/me', req.query);
+        pid = me?.data?.id;
+      }
+      if (!pid) throw new Error('Could not get person ID');
       const data = await pcoFetch(
-        `/services/v2/people/${personId}/plan_people?filter=future&order=sort_date&per_page=20&include=plan,service_type`,
+        `/services/v2/people/${pid}/plan_people?filter=future&order=sort_date&per_page=20&include=plan,service_type`,
         req.query
       );
       return res.status(200).json(data);
@@ -54,49 +62,19 @@ export default async function handler(req, res) {
 
     if (action === 'attachments' && serviceTypeId && planId) {
       const results = {};
-
       if (planItemId) {
-        try {
-          const r = await pcoFetch(
-            `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments?per_page=50`,
-            req.query
-          );
-          results.itemAttachments = r.data || [];
-        } catch (e) { results.itemAttachments = []; }
+        try { const r = await pcoFetch(`/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments?per_page=50`, req.query); results.itemAttachments = r.data || []; } catch (e) { results.itemAttachments = []; }
       } else { results.itemAttachments = []; }
-
-      try {
-        const r = await pcoFetch(
-          `/services/v2/service_types/${serviceTypeId}/plans/${planId}/attachments?per_page=50`,
-          req.query
-        );
-        results.planAttachments = r.data || [];
-      } catch (e) { results.planAttachments = []; }
-
-      if (songId) {
-        try {
-          const r = await pcoFetch(`/services/v2/songs/${songId}/attachments?per_page=50`, req.query);
-          results.songAttachments = r.data || [];
-        } catch (e) { results.songAttachments = []; }
-      } else { results.songAttachments = []; }
-
-      if (songId && arrangementId) {
-        try {
-          const r = await pcoFetch(`/services/v2/songs/${songId}/arrangements/${arrangementId}/attachments?per_page=50`, req.query);
-          results.arrangementAttachments = r.data || [];
-        } catch (e) { results.arrangementAttachments = []; }
-      } else { results.arrangementAttachments = []; }
-
+      try { const r = await pcoFetch(`/services/v2/service_types/${serviceTypeId}/plans/${planId}/attachments?per_page=50`, req.query); results.planAttachments = r.data || []; } catch (e) { results.planAttachments = []; }
+      if (songId) { try { const r = await pcoFetch(`/services/v2/songs/${songId}/attachments?per_page=50`, req.query); results.songAttachments = r.data || []; } catch (e) { results.songAttachments = []; } } else { results.songAttachments = []; }
+      if (songId && arrangementId) { try { const r = await pcoFetch(`/services/v2/songs/${songId}/arrangements/${arrangementId}/attachments?per_page=50`, req.query); results.arrangementAttachments = r.data || []; } catch (e) { results.arrangementAttachments = []; } } else { results.arrangementAttachments = []; }
       return res.status(200).json(results);
     }
 
     if (action === 'attachmentUrl' && attachmentId) {
       if (serviceTypeId && planId && planItemId) {
         try {
-          const data = await pcoFetch(
-            `/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments/${attachmentId}`,
-            req.query
-          );
+          const data = await pcoFetch(`/services/v2/service_types/${serviceTypeId}/plans/${planId}/items/${planItemId}/attachments/${attachmentId}`, req.query);
           return res.status(200).json(data);
         } catch (e) {}
       }
@@ -104,7 +82,6 @@ export default async function handler(req, res) {
     }
 
     return res.status(400).json({ error: 'Unknown action or missing params' });
-
   } catch (error) {
     console.error('PCO proxy error:', error.message);
     return res.status(500).json({ error: error.message });
