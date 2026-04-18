@@ -1070,50 +1070,56 @@ function PDFViewer({ song, url, onClose }) {
 
 // ── Services View ────────────────────────────────────────────────────────────
 function TeamPicker({ onSelect }) {
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    pcoGet('teamMembers').then(data => {
-      const people = (data.data || []).map(p => ({
-        id: p.id,
-        name: (p.attributes.first_name + ' ' + p.attributes.last_name).trim(),
-        first: p.attributes.first_name || '',
-      }));
-      setMembers(people);
-      setLoading(false);
-    }).catch(() => { setError('Could not load team. Check your connection.'); setLoading(false); });
-  }, []);
+  const TEAM = [
+    { first: 'Tim', last: 'Tarrant' },
+    { first: 'Abigail', last: 'Navolt' },
+    { first: 'Austin', last: 'Mandes' },
+    { first: 'Brianna', last: 'Harvey' },
+    { first: 'Carlee', last: 'Santana' },
+    { first: 'Carlie', last: 'Foster' },
+    { first: 'Sam', last: 'Langton' },
+    { first: 'Chris', last: 'Scott' },
+    { first: 'Christine', last: 'Navolt' },
+    { first: 'Grace', last: 'Motter' },
+    { first: 'Samantha', last: 'Le' },
+    { first: 'Matt', last: 'Schmitz' },
+    { first: 'Dan', last: 'Schmitz' },
+    { first: 'Spencer', last: 'Wenger' },
+    { first: 'Josiah', last: 'Tiner' },
+    { first: 'Rena', last: 'Tarrant' },
+  ];
 
-  const filtered = search ? members.filter(m => m.name.toLowerCase().includes(search.toLowerCase())) : members;
-
-  function pick(member) {
-    localStorage.setItem('selah-user', JSON.stringify({ personId: member.id, name: member.first, fullName: member.name }));
-    onSelect();
+  async function pick(member) {
+    setLoading(true); setError('');
+    try {
+      const data = await pcoGet('searchPerson', { firstName: member.first, lastName: member.last });
+      const person = data.data?.[0];
+      if (!person) { setError('Could not find ' + member.first + ' in Planning Center.'); setLoading(false); return; }
+      localStorage.setItem('selah-user', JSON.stringify({ personId: person.id, name: member.first, fullName: member.first + ' ' + member.last }));
+      onSelect();
+    } catch { setError('Connection error. Try again.'); }
+    finally { setLoading(false); }
   }
 
   return (
     <div style={{ padding:'20px 16px' }}>
       <div style={{ textAlign:'center', marginBottom:20 }}>
         <div style={{ fontSize:18, fontWeight:700, marginBottom:6 }}>Who are you?</div>
-        <div style={{ fontSize:13, color:'var(--text2)', lineHeight:1.5 }}>Pick your name to see your schedule.</div>
+        <div style={{ fontSize:13, color:'var(--text2)', lineHeight:1.5 }}>Tap your name to see your schedule.</div>
       </div>
-      {loading && <div style={{ textAlign:'center', padding:'40px 0' }}><div className="loading-spinner" /><div style={{ fontSize:13, color:'var(--text3)' }}>Loading team…</div></div>}
       {error && <div className="error-card" style={{ margin:'0 0 12px' }}>{error}</div>}
-      {!loading && !error && (
-        <>
-          <input className="text-input" placeholder="Search by name…" value={search} onChange={e => setSearch(e.target.value)} style={{ marginBottom:12 }} />
-          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-            {filtered.map(m => (
-              <div key={m.id} onClick={() => pick(m)} style={{ padding:'12px 14px', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', cursor:'pointer', fontSize:15, fontWeight:500, WebkitTapHighlightColor:'transparent' }}>
-                {m.name}
-              </div>
-            ))}
-            {filtered.length === 0 && <div style={{ textAlign:'center', padding:'20px', color:'var(--text3)', fontSize:13 }}>No matches found.</div>}
-          </div>
-        </>
+      {loading && <div style={{ textAlign:'center', padding:'30px 0' }}><div className="loading-spinner" /><div style={{ fontSize:13, color:'var(--text3)' }}>Finding you in Planning Center…</div></div>}
+      {!loading && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+          {TEAM.map(m => (
+            <div key={m.first+m.last} onClick={() => pick(m)} style={{ padding:'14px 12px', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', cursor:'pointer', textAlign:'center', fontSize:14, fontWeight:500, WebkitTapHighlightColor:'transparent' }}>
+              {m.first} {m.last}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
