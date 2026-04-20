@@ -62,6 +62,9 @@ const INSTRUMENTS = [
   { id: 'vocals',   label: 'Vocals',          emoji: '🎤', color: '#f0a070', tabLabel: 'Lyrics',     notesLabel: 'Player Notes' },
 ];
 function getInstrument(id) { return INSTRUMENTS.find(i => i.id === id) || INSTRUMENTS[0]; }
+
+// ── PDF helpers ──────────────────────────────────────────────────────────────
+// Fetches the direct PCO signed URL for a song's PDF attachment
 async function fetchPdfUrlForSong(song) {
   try {
     const data = await pcoGet('attachments', { serviceTypeId: song.serviceTypeId || '', planId: song.planId || '', planItemId: song.itemId || '', songId: song.songId || '', arrangementId: song.arrangementId || '' });
@@ -81,6 +84,22 @@ async function fetchPdfUrlForSong(song) {
     }
   } catch {}
   return null;
+}
+
+// Fetches PDF via our proxy, returns a blob URL for iframe rendering
+async function fetchPdfBlobUrl(directUrl) {
+  if (!directUrl) return null;
+  try {
+    const proxyUrl = '/api/pdf-proxy?url=' + encodeURIComponent(directUrl);
+    const resp = await fetch(proxyUrl);
+    if (!resp.ok) return null;
+    const contentType = resp.headers.get('content-type') || '';
+    if (!contentType.includes('pdf')) return null;
+    const blob = await resp.blob();
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
 }
 
 // ── Chord Reference Panel ────────────────────────────────────────────────────
@@ -503,6 +522,9 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .stage-note-box { margin-top: 12px; padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); border-left: 3px solid var(--accent); }
 .stage-note-label { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
 .stage-note-text { font-size: 13px; color: var(--text2); line-height: 1.6; white-space: pre-wrap; }
+.inline-pdf-frame { width: 100%; height: calc(100vh - 340px); min-height: 400px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; }
+.inline-pdf-fallback { text-align: center; margin-top: 10px; }
+.inline-pdf-fallback a { color: var(--purple); font-size: 12px; text-decoration: none; }
 `;
 }
 
@@ -726,17 +748,13 @@ function Onboarding({ onSelect }) {
 function CapoView() {
   const [songKey, setSongKey] = useState('C');
   const [capoFret, setCapoFret] = useState(0);
-  const [findMode, setFindMode] = useState('result'); // result = given key+capo show sounding key; find = given song key show capo options
+  const [findMode, setFindMode] = useState('result');
 
   const friendlyKeys = ['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
-  const easyKeys = ['C','D','E','G','A']; // beginner-friendly open chord keys
+  const easyKeys = ['C','D','E','G','A'];
 
-  // Given open chord key + capo, what key are you sounding in?
-  
-  // Actually: capo raises pitch. If you play G shapes with capo 2, you sound in A.
   const soundingKeyActual = CHROMATIC[(CHROMATIC.indexOf(normalizeNote(songKey)) + capoFret) % 12];
 
-  // Given a target song key, show capo options for each easy key
   const capoOptions = easyKeys.map(openKey => {
     const st = semitonesBetween(openKey, songKey);
     return { openKey, capo: st, sounding: songKey };
@@ -797,19 +815,11 @@ function CapoView() {
           {capoOptions.length > 0 ? (
             <div style={{ marginTop:10 }}>
               <table className="capo-table">
-                <thead>
-                  <tr>
-                    <th>Open chord shapes</th>
-                    <th>Capo fret</th>
-                    <th>Sounds in</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Open chord shapes</th><th>Capo fret</th><th>Sounds in</th></tr></thead>
                 <tbody>
                   {capoOptions.map(o => (
                     <tr key={o.openKey} className={o.capo === 0 ? 'highlight' : ''}>
-                      <td>{o.openKey}</td>
-                      <td>{o.capo === 0 ? 'No capo' : `Fret ${o.capo}`}</td>
-                      <td>{o.sounding}</td>
+                      <td>{o.openKey}</td><td>{o.capo === 0 ? 'No capo' : `Fret ${o.capo}`}</td><td>{o.sounding}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -819,7 +829,7 @@ function CapoView() {
               </div>
             </div>
           ) : (
-            <div style={{ fontSize:13, color:'var(--text3)', marginTop:10 }}>No standard capo options found for this key. Try a partial capo or alternate tuning.</div>
+            <div style={{ fontSize:13, color:'var(--text3)', marginTop:10 }}>No standard capo options found for this key.</div>
           )}
         </div>
       )}
@@ -827,20 +837,11 @@ function CapoView() {
       <div className="capo-section">
         <div className="capo-section-title">Quick reference</div>
         <div className="capo-card">
-          <div style={{ fontSize:12, color:'var(--text2)', marginBottom:10, lineHeight:1.6 }}>
-            Common worship key conversions using G or C shapes:
-          </div>
+          <div style={{ fontSize:12, color:'var(--text2)', marginBottom:10, lineHeight:1.6 }}>Common worship key conversions using G or C shapes:</div>
           <table className="capo-table">
             <thead><tr><th>Song key</th><th>Capo</th><th>Play shapes in</th></tr></thead>
             <tbody>
-              {[
-                ['Bb','3','G'],['Bb','1','A'],
-                ['Ab','1','G'],['Ab','4','E'],
-                ['Eb','3','C'],['Eb','6','A'],
-                ['F','5','C'],['F','3','D'],
-                ['B','4','G'],['B','2','A'],
-                ['Db','4','A'],['Db','1','C'],
-              ].map(([key,capo,shapes]) => (
+              {[['Bb','3','G'],['Bb','1','A'],['Ab','1','G'],['Ab','4','E'],['Eb','3','C'],['Eb','6','A'],['F','5','C'],['F','3','D'],['B','4','G'],['B','2','A'],['Db','4','A'],['Db','1','C']].map(([key,capo,shapes]) => (
                 <tr key={key+capo}><td>{key}</td><td>Fret {capo}</td><td>{shapes}</td></tr>
               ))}
             </tbody>
@@ -857,6 +858,8 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
   const [idx, setIdx] = useState(0);
   const [tps, setTps] = useState(() => songs.map(() => 0));
   const [tabs, setTabs] = useState(() => songs.map(() => 'chart'));
+  // pdfUrls stores: { songTitle: { directUrl, blobUrl, status } }
+  // status: 'loading' | 'ready' | 'fallback' | 'none'
   const [pdfUrls, setPdfUrls] = useState({});
   const touchStartX = useRef(null);
   const [dragX, setDragX] = useState(0);
@@ -867,15 +870,34 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
   const st = tps[idx] || 0;
   const tKey = cur?.data ? transposeKey(cur.data.key || '', st) : '';
   const isDrums = inst.id === 'drums';
-  // Pre-fetch all PDF URLs on mount
+
+  // Pre-fetch all PDF URLs on mount, then proxy them for inline rendering
   useEffect(() => {
     songs.forEach(song => {
       if (song.itemId) {
-        fetchPdfUrlForSong(song).then(url => {
-          setPdfUrls(p => ({ ...p, [song.title]: url || 'none' }));
+        setPdfUrls(p => ({ ...p, [song.title]: { directUrl: null, blobUrl: null, status: 'loading' } }));
+        fetchPdfUrlForSong(song).then(async (directUrl) => {
+          if (!directUrl) {
+            setPdfUrls(p => ({ ...p, [song.title]: { directUrl: null, blobUrl: null, status: 'none' } }));
+            return;
+          }
+          // Try to get a blob URL via the proxy for inline rendering
+          const blobUrl = await fetchPdfBlobUrl(directUrl);
+          if (blobUrl) {
+            setPdfUrls(p => ({ ...p, [song.title]: { directUrl, blobUrl, status: 'ready' } }));
+          } else {
+            // Proxy failed — fall back to direct link (opens in browser)
+            setPdfUrls(p => ({ ...p, [song.title]: { directUrl, blobUrl: null, status: 'fallback' } }));
+          }
         });
       }
     });
+    // Cleanup blob URLs on unmount
+    return () => {
+      Object.values(pdfUrls).forEach(p => {
+        if (p?.blobUrl) try { URL.revokeObjectURL(p.blobUrl); } catch {}
+      });
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function goTo(i) { if (i >= 0 && i < total) { setIdx(i); setDragX(0); } }
@@ -892,7 +914,6 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
     transform: `translateX(calc(${-idx * 100}% + ${dragX}px))`,
     transition: isDragging.current ? 'none' : 'transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94)',
   };
-  
 
   return (
     <div className="stage-overlay">
@@ -915,6 +936,7 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
             const sTab = tabs[si] || 'chart';
             const showTab = !isDrums && inst.id !== 'vocals';
             const note = songNotes?.[song.title] || '';
+            const pdf = pdfUrls[song.title] || {};
             return (
               <div key={si} className="stage-panel">
                 <div className="stage-song-title">{song.title}</div>
@@ -943,20 +965,43 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
                       <button className={`stage-tab${sTab==='numbers'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='numbers'; return n; })}>Numbers</button>
                       <button className={`stage-tab${sTab==='notes'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='notes'; return n; })}>Notes</button>
                     </div>
+
+                    {/* ── INLINE PDF CHART TAB ── */}
                     {sTab === 'chart' && song.itemId && (
                       <div>
-                        {!pdfUrls[song.title] && <div style={{ textAlign:'center', padding:'30px 0' }}><div className="loading-spinner" /><div style={{ fontSize:13, color:'var(--text3)' }}>Loading chord chart…</div></div>}
-                        {pdfUrls[song.title] === 'none' && <div style={{ textAlign:'center', padding:'30px 0', color:'var(--text3)', fontSize:13 }}>No PDF chord chart found.</div>}
-                        {pdfUrls[song.title] && pdfUrls[song.title] !== 'none' && (
+                        {pdf.status === 'loading' && (
+                          <div style={{ textAlign:'center', padding:'30px 0' }}>
+                            <div className="loading-spinner" />
+                            <div style={{ fontSize:13, color:'var(--text3)' }}>Loading chord chart…</div>
+                          </div>
+                        )}
+                        {pdf.status === 'none' && (
+                          <div style={{ textAlign:'center', padding:'30px 0', color:'var(--text3)', fontSize:13 }}>No PDF chord chart found for this song.</div>
+                        )}
+                        {pdf.status === 'ready' && pdf.blobUrl && (
+                          <div>
+                            <iframe
+                              className="inline-pdf-frame"
+                              src={pdf.blobUrl}
+                              title={`${song.title} chord chart`}
+                            />
+                            <div className="inline-pdf-fallback">
+                              <a href={pdf.directUrl} target="_blank" rel="noopener noreferrer">Open in browser ↗</a>
+                            </div>
+                          </div>
+                        )}
+                        {pdf.status === 'fallback' && pdf.directUrl && (
                           <div style={{ textAlign:'center', padding:'30px 0' }}>
                             <div style={{ fontSize:14, color:'var(--text2)', marginBottom:16 }}>Chord chart ready</div>
-                            <a href={pdfUrls[song.title]} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none' }}>
+                            <a href={pdf.directUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none' }}>
                               <button style={{ padding:'16px 32px', background:'var(--purple)', color:'#0f0f0f', fontFamily:'var(--font)', fontSize:16, fontWeight:700, border:'none', borderRadius:'var(--radius)', cursor:'pointer' }}>Open Chord Chart ↗</button>
                             </a>
+                            <div style={{ fontSize:11, color:'var(--text3)', marginTop:10 }}>Inline preview unavailable — opens in browser</div>
                           </div>
                         )}
                       </div>
                     )}
+
                     {sTab === 'numbers' && song.data?.chordList?.length > 0 && (
                       <ChordReferencePanel data={song.data} transpose={s} />
                     )}
@@ -1122,14 +1167,14 @@ function ServicesView({ onAddToSetlist }) {
   useEffect(() => {
     try {
       const user = getSelectedUser();
-const saved = localStorage.getItem('selah-synced-plans-' + (user?.personId || 'default'));
+      const saved = localStorage.getItem('selah-synced-plans-' + (user?.personId || 'default'));
       if (saved) {
         const { plans } = JSON.parse(saved);
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const future = plans.filter(p => p.date && new Date(p.date) >= today);
         if (future.length > 0) {
           setMyPlans(future); setHasLoaded(true);
-          try { localStorage.setItem('selah-synced-plans' + (user?.personId || 'default'), JSON.stringify({ plans: future, syncedAt: Date.now() })); } catch {}
+          try { localStorage.setItem('selah-synced-plans-' + (user?.personId || 'default'), JSON.stringify({ plans: future, syncedAt: Date.now() })); } catch {}
         }
       }
     } catch {}
@@ -1157,7 +1202,7 @@ const saved = localStorage.getItem('selah-synced-plans-' + (user?.personId || 'd
       });
       enriched.sort((a, b) => new Date(a.date) - new Date(b.date));
       const user2 = getSelectedUser();
-      try { localStorage.setItem('selah-synced-plans' + (user2?.personId || 'default'), JSON.stringify({ plans: enriched, syncedAt: Date.now() })); } catch {}
+      try { localStorage.setItem('selah-synced-plans-' + (user2?.personId || 'default'), JSON.stringify({ plans: enriched, syncedAt: Date.now() })); } catch {}
       setMyPlans(enriched); setHasLoaded(true);
     } catch (e) { setError('Could not connect to Planning Center. ' + e.message); }
     finally { setSyncing(false); }
@@ -1564,12 +1609,12 @@ export default function App() {
             ) : (
               <div className="setlist-items" ref={listRef} onTouchMove={onTouchHandleMove} onTouchEnd={onTouchHandleEnd}>
                 {setlistSongs.map((song, i) => {
-                  const isDragging = draggingIdx === i;
-                  const isOver = (dragOverVisual === i || touchOverIdx === i) && !isDragging;
+                  const isDraggingItem = draggingIdx === i;
+                  const isOver = (dragOverVisual === i || touchOverIdx === i) && !isDraggingItem;
                   const hasNote = !!(songNotes[song.title]);
                   const noteExpanded = expandedNoteIdx === i;
                   return (
-                    <div key={i} data-setlist-idx={i} className={`setlist-item ${song.status}`} style={{ flexDirection:'column', alignItems:'stretch', opacity:isDragging?0.4:1, borderColor:isOver?'var(--accent)':undefined, transform:isOver?'scale(1.01)':'scale(1)', transition:'opacity 0.15s, transform 0.15s' }}
+                    <div key={i} data-setlist-idx={i} className={`setlist-item ${song.status}`} style={{ flexDirection:'column', alignItems:'stretch', opacity:isDraggingItem?0.4:1, borderColor:isOver?'var(--accent)':undefined, transform:isOver?'scale(1.01)':'scale(1)', transition:'opacity 0.15s, transform 0.15s' }}
                       draggable onDragStart={() => onDragStart(i)} onDragOver={e=>onDragOver(e,i)} onDragEnd={onDragEnd} onDrop={() => onDrop(i)}>
                       <div style={{ display:'flex', alignItems:'center', gap:7 }}>
                         <div className="item-drag-handle" onTouchStart={e=>onTouchHandleStart(e,i)} style={{ cursor:touchDragActive?'grabbing':'grab' }}>☰</div>
