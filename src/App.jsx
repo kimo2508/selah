@@ -85,7 +85,7 @@ function detectSection(line) {
   }
   return null;
 }
-const CHORD_TOKEN_RE = /^[A-G][#b]?[A-Za-z0-9°ø+#\-]*(?:\/[A-G][#b]?)?$/;
+const CHORD_TOKEN_RE = /^[A-G][#b]?[A-Za-z0-9°ø+#-]*(?:\/[A-G][#b]?)?$/;
 const BAR_SEP_RE = /^[|\-.]+$/;
 function isChordLine(line) {
   const tokens = line.trim().split(/\s+/).filter(Boolean);
