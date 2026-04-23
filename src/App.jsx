@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-
 // ── Transpose helpers ────────────────────────────────────────────────────────
 const CHROMATIC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const ENHARMONIC = { 'Db':'C#','Eb':'D#','Gb':'F#','Ab':'G#','Bb':'A#' };
@@ -34,7 +33,6 @@ function semitonesBetween(from, to) {
   if (f === -1 || t === -1) return 0;
   return ((t - f) + 12) % 12;
 }
-
 // ── Nashville Number System ──────────────────────────────────────────────────
 function romanToNashville(func) {
   if (!func) return '';
@@ -51,7 +49,105 @@ function romanToNashville(func) {
   const minSuffix = isLower && !quality.includes('m') ? 'm' : '';
   return num + minSuffix + quality.replace(/^m(?!aj|in)/i, '');
 }
-
+// ── PCO Chord Chart Parser ───────────────────────────────────────────────────
+const SECTION_PATTERNS = [
+  [/^verse\s*(\d*)$/i,            'Verse'],
+  [/^v\s*(\d+)$/i,                'Verse'],
+  [/^v$/i,                        'Verse'],
+  [/^chorus\s*(\d*)$/i,           'Chorus'],
+  [/^ch?\s*(\d+)$/i,              'Chorus'],
+  [/^ch?$/i,                      'Chorus'],
+  [/^pre[-\s]?chorus\s*(\d*)$/i,  'Pre-Chorus'],
+  [/^pc\s*(\d*)$/i,               'Pre-Chorus'],
+  [/^bridge\s*(\d*)$/i,           'Bridge'],
+  [/^br?\s*(\d+)$/i,              'Bridge'],
+  [/^br?$/i,                      'Bridge'],
+  [/^intro$/i,                    'Intro'], [/^i$/i, 'Intro'],
+  [/^outro$/i,                    'Outro'], [/^o$/i, 'Outro'],
+  [/^end(ing)?$/i,                'Ending'],
+  [/^tag$/i,                      'Tag'],   [/^t$/i, 'Tag'],
+  [/^inst(rumental)?$/i,          'Instrumental'], [/^in$/i, 'Instrumental'],
+  [/^interlude$/i,                'Interlude'],
+  [/^ref(rain)?$/i,               'Refrain'], [/^r$/i, 'Refrain'],
+  [/^vamp$/i,                     'Vamp'],
+  [/^break$/i,                    'Break'],
+  [/^turn(around)?$/i,            'Turnaround'],
+  [/^coda$/i,                     'Coda'],
+  [/^solo$/i,                     'Solo'],
+  [/^misc$/i,                     'Misc'],
+];
+function detectSection(line) {
+  const trimmed = line.trim().replace(/:$/, '').trim();
+  if (!trimmed || trimmed.length > 30) return null;
+  for (const [re, label] of SECTION_PATTERNS) {
+    const m = trimmed.match(re);
+    if (m) return m[1] ? `${label} ${m[1]}` : label;
+  }
+  return null;
+}
+const CHORD_TOKEN_RE = /^[A-G][#b]?[A-Za-z0-9°ø+#\-]*(?:\/[A-G][#b]?)?$/;
+const BAR_SEP_RE = /^[|\-.]+$/;
+function isChordLine(line) {
+  const tokens = line.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return false;
+  let hasChord = false;
+  for (const t of tokens) {
+    if (CHORD_TOKEN_RE.test(t)) { hasChord = true; continue; }
+    if (BAR_SEP_RE.test(t)) continue;
+    return false;
+  }
+  return hasChord;
+}
+function parsePcoChordChart(chordChartText) {
+  if (!chordChartText || typeof chordChartText !== 'string') return [];
+  const lines = chordChartText.replace(/\r\n/g, '\n').split('\n');
+  const sections = [];
+  let current = null;
+  for (const raw of lines) {
+    const sec = detectSection(raw);
+    if (sec) { current = { name: sec, lines: [] }; sections.push(current); continue; }
+    if (isChordLine(raw)) {
+      if (!current) { current = { name: 'Song', lines: [] }; sections.push(current); }
+      current.lines.push(raw.replace(/\s+$/, ''));
+    }
+  }
+  return sections.filter(s => s.lines.length > 0);
+}
+// ── Nashville Number conversion (major-scale degrees relative to tonic) ─────
+const NASHVILLE_DEGREE = { 0:'1',1:'b2',2:'2',3:'b3',4:'3',5:'4',6:'#4',7:'5',8:'b6',9:'6',10:'b7',11:'7' };
+function keyTonic(k) {
+  if (!k) return '';
+  const m = k.match(/^([A-G][#b]?)/);
+  return m ? m[1] : '';
+}
+function noteToDegree(note, tonic) {
+  const f = CHROMATIC.indexOf(normalizeNote(tonic));
+  const t = CHROMATIC.indexOf(normalizeNote(note));
+  if (f === -1 || t === -1) return note;
+  const st = ((t - f) % 12 + 12) % 12;
+  return NASHVILLE_DEGREE[st] || String(st);
+}
+function chordToNumber(chord, tonic) {
+  if (!chord || !tonic) return chord;
+  if (chord.includes('/')) {
+    const [top, bass] = chord.split('/');
+    return chordToNumber(top, tonic) + '/' + noteToDegree(bass, tonic);
+  }
+  const m = chord.match(/^([A-G][#b]?)(.*)$/);
+  if (!m) return chord;
+  const [, root, rawQual] = m;
+  let quality = rawQual || '';
+  let minor = false;
+  if (/^m(?!aj)/.test(quality)) { minor = true; quality = quality.slice(1); }
+  return noteToDegree(root, tonic) + (minor ? 'm' : '') + quality;
+}
+function transformChordLine(line, transposeSt, asNumbers, tonic) {
+  return line.replace(/\S+/g, (tok) => {
+    if (!CHORD_TOKEN_RE.test(tok)) return tok;
+    const t = transposeChord(tok, transposeSt);
+    return asNumbers ? chordToNumber(t, tonic) : t;
+  });
+}
 // ── Instrument definitions ───────────────────────────────────────────────────
 const INSTRUMENTS = [
   { id: 'bass',     label: 'Bass',           emoji: '🎸', color: '#e8c170', tabLabel: 'Bass Tab',   notesLabel: 'Player Notes' },
@@ -62,7 +158,6 @@ const INSTRUMENTS = [
   { id: 'vocals',   label: 'Vocals',          emoji: '🎤', color: '#f0a070', tabLabel: 'Lyrics',     notesLabel: 'Player Notes' },
 ];
 function getInstrument(id) { return INSTRUMENTS.find(i => i.id === id) || INSTRUMENTS[0]; }
-
 // ── PDF helpers ──────────────────────────────────────────────────────────────
 // Fetches the direct PCO signed URL for a song's PDF attachment
 async function fetchPdfUrlForSong(song) {
@@ -85,7 +180,6 @@ async function fetchPdfUrlForSong(song) {
   } catch {}
   return null;
 }
-
 // Fetches PDF via our proxy, returns a blob URL for iframe rendering
 async function fetchPdfBlobUrl(directUrl) {
   if (!directUrl) return null;
@@ -101,7 +195,6 @@ async function fetchPdfBlobUrl(directUrl) {
     return null;
   }
 }
-
 // ── Chord Reference Panel ────────────────────────────────────────────────────
 function ChordReferencePanel({ data, transpose }) {
   if (!data?.chordList?.length) return null;
@@ -123,38 +216,70 @@ function ChordReferencePanel({ data, transpose }) {
     </div>
   );
 }
-
+// ── Sectioned Chord Chart (from PCO text) ─────────────────────────────────────
+function SectionedChart({ sections, songKey, transpose, asNumbers }) {
+  if (!sections?.length) {
+    return (
+      <div style={{ color:'var(--text3)', fontSize:13, padding:'20px 0', textAlign:'center' }}>
+        No chord chart text available for this song.
+      </div>
+    );
+  }
+  const tKey = transposeKey(songKey || '', transpose);
+  const tonic = keyTonic(tKey);
+  return (
+    <div>
+      <div style={{ fontSize:10, fontWeight:600, letterSpacing:1, textTransform:'uppercase', color:'var(--text3)', marginBottom:10 }}>
+        {asNumbers
+          ? <>Nashville Numbers · Tonic <span style={{ color:'var(--accent)', fontWeight:700 }}>{tonic || '—'}</span></>
+          : <>Chord Chart · Key of <span style={{ color:'var(--accent)', fontWeight:700 }}>{tKey || '—'}</span></>}
+      </div>
+      {sections.map((sec, si) => (
+        <div key={si} style={{ marginBottom: 18 }}>
+          <div className="section-name" style={{ marginBottom: 6 }}>{sec.name}</div>
+          <div style={{
+            fontFamily:'var(--mono)', fontSize:15, fontWeight:700, color:'var(--text)',
+            lineHeight:1.85, background:'var(--bg3)', border:'1px solid var(--border)',
+            borderRadius:'var(--radius-sm)', padding:'10px 12px', overflowX:'auto',
+            WebkitOverflowScrolling:'touch',
+          }}>
+            {sec.lines.map((line, li) => (
+              <div key={li} style={{ whiteSpace:'pre' }}>
+                {transformChordLine(line, transpose, asNumbers, tonic) || '\u00A0'}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 // ── Instrument-specific AI prompts ───────────────────────────────────────────
 function buildPrompt(title, artist, instrumentId, songKey = '') {
   const keyInstruction = songKey ? ` The song is in the key of ${songKey}. Generate the chart in exactly this key.` : '';
   const base = `Song: "${title}" by "${artist || 'unknown'}".${keyInstruction} Return ONLY valid JSON, no markdown, no backticks.`;
   const keyStr = songKey || 'G';
-
   if (instrumentId === 'drums') {
     return `${base}
 Generate a drum roadmap for this worship song in the key of ${keyStr}.
 {"title":"song title","artist":"artist name","key":"${keyStr}","bpm":72,"timeSignature":"4/4","chordList":[{"chord":"G","function":"I"},{"chord":"C","function":"IV"}],"sections":[{"name":"Intro","repeat":1,"bars":4,"lines":[[{"chord":"—","beats":4,"function":""}]]},{"name":"Verse","repeat":2,"bars":8,"lines":[[{"chord":"—","beats":4,"function":""}]]}],"bassTab":null,"drumMap":{"Intro":{"feel":"soft brushes or light sticks","dynamics":"pp","notes":"establish the groove quietly"},"Verse":{"feel":"hi-hat pattern, soft kick on 1 and 3","dynamics":"mp","notes":"stay light, let the vocals breathe"},"Chorus":{"feel":"open hi-hat on 2 and 4, full kit","dynamics":"mf","notes":"drive with energy, crash on 1"},"Bridge":{"feel":"half-time feel or build","dynamics":"f","notes":"big fill into last chorus"}},"bassNotes":{"feel":"Overall groove and feel description for the drummer","rootNotes":"Key signature and time feel notes","dynamics":"How dynamics should build through the song","tips":["Tip about the kick pattern","Tip about hi-hat feel","Tip about fills and transitions"]}}`;
   }
-
   if (instrumentId === 'vocals') {
     return `${base}
 Generate a vocal chart for this worship song in the key of ${keyStr}.
 {"title":"song title","artist":"artist name","key":"${keyStr}","bpm":72,"timeSignature":"4/4","chordList":[{"chord":"G","function":"I"},{"chord":"C","function":"IV"},{"chord":"D","function":"V"},{"chord":"Em","function":"vi"}],"sections":[{"name":"Verse","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I","lyric":"First line of lyrics here"}],[{"chord":"C","beats":4,"function":"IV","lyric":"Second line of lyrics here"}]]},{"name":"Chorus","repeat":2,"lines":[[{"chord":"G","beats":2,"function":"I","lyric":"Chorus first line"},{"chord":"D","beats":2,"function":"V","lyric":""}]]}],"bassTab":null,"bassNotes":{"feel":"Vocal style and delivery notes","rootNotes":"Range and key notes for the vocalist","dynamics":"Where to build energy and pull back","tips":["Breathing tip","Phrasing tip","Harmony or ad-lib opportunity"]}}`;
   }
-
   if (instrumentId === 'keys') {
     return `${base}
 Generate a keys/piano chart for this worship song in the key of ${keyStr}.
 {"title":"song title","artist":"artist name","key":"${keyStr}","bpm":72,"timeSignature":"4/4","chordList":[{"chord":"G","function":"I"},{"chord":"C","function":"IV"},{"chord":"D","function":"V"},{"chord":"Em","function":"vi"}],"sections":[{"name":"Verse","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"C","beats":4,"function":"IV"}],[{"chord":"D","beats":4,"function":"V"},{"chord":"G","beats":4,"function":"I"}]]},{"name":"Chorus","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"D","beats":4,"function":"V"}],[{"chord":"Em","beats":4,"function":"vi"},{"chord":"C","beats":4,"function":"IV"}]]}],"bassTab":{"Verse":{"voicing":"Open voicing, root-5th-3rd, soft pads","leftHand":"Root notes only","rightHand":"Gentle arpeggios or sustained chords","description":"Lay back, support the band without cluttering"},"Chorus":{"voicing":"Full chord voicings, 1st inversion on D","leftHand":"Root-fifth","rightHand":"Full chords on beat 1, arpeggiate on 2-4","description":"Fill out the sound, drive the energy"}},"bassNotes":{"feel":"Overall keys role in the band for this song","rootNotes":"Key chord shapes and inversions to use","dynamics":"When to use pads vs full chords vs nothing","tips":["Voicing tip","When to lay out","Pedal and tone tip"]}}`;
   }
-
   if (instrumentId === 'acoustic' || instrumentId === 'electric') {
     const isElectric = instrumentId === 'electric';
     return `${base}
 Generate a ${isElectric ? 'electric' : 'acoustic'} guitar chart for this worship song in the key of ${keyStr}.
 {"title":"song title","artist":"artist name","key":"${keyStr}","bpm":72,"timeSignature":"4/4","capo":null,"chordList":[{"chord":"G","function":"I"},{"chord":"C","function":"IV"},{"chord":"D","function":"V"},{"chord":"Em","function":"vi"}],"sections":[{"name":"Verse","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"C","beats":4,"function":"IV"}],[{"chord":"D","beats":4,"function":"V"},{"chord":"G","beats":4,"function":"I"}]]},{"name":"Chorus","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"D","beats":4,"function":"V"}],[{"chord":"Em","beats":4,"function":"vi"},{"chord":"C","beats":4,"function":"IV"}]]}],"bassTab":{"Verse":{"G":"e|--3--|","D":"B|--3--|","A":"G|--0--|","E":"D|--0--|","description":"${isElectric ? 'Clean tone, single note fills' : 'Down strums, gentle fingerpick pattern'}"},"Chorus":{"G":"e|--3--|","D":"B|--3--|","A":"G|--0--|","E":"D|--2--|","description":"${isElectric ? 'Light overdrive, full strums on 1' : 'Full strums, drive the energy'}"}},"bassNotes":{"feel":"Overall guitar role and feel","rootNotes":"${isElectric ? 'Tone settings and pickup suggestions' : 'Capo position and open chord shapes'}","dynamics":"Strumming pattern and dynamic approach","tips":["${isElectric ? 'Tone/effect tip' : 'Strumming pattern tip'}","Transition tip","When to simplify"]}}`;
   }
-
   // Default: bass
   return `${base}
 You are generating a bass chart for "${title}" by "${artist || 'unknown'}" in the key of ${keyStr}.
@@ -162,7 +287,6 @@ Use the actual known chord progression for this specific worship song. Be accura
 Include a chordList of every unique chord used in the song.
 {"title":"song title","artist":"artist name","key":"${keyStr}","bpm":72,"timeSignature":"4/4","chordList":[{"chord":"G","function":"I"},{"chord":"C","function":"IV"},{"chord":"D","function":"V"},{"chord":"Em","function":"vi"}],"sections":[{"name":"Verse","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"C","beats":4,"function":"IV"}],[{"chord":"D","beats":4,"function":"V"},{"chord":"G","beats":4,"function":"I"}]]},{"name":"Pre-Chorus","repeat":1,"lines":[[{"chord":"Em","beats":4,"function":"vi"},{"chord":"C","beats":4,"function":"IV"}]]},{"name":"Chorus","repeat":2,"lines":[[{"chord":"G","beats":4,"function":"I"},{"chord":"D","beats":4,"function":"V"}],[{"chord":"Em","beats":4,"function":"vi"},{"chord":"C","beats":4,"function":"IV"}]]},{"name":"Bridge","repeat":1,"lines":[[{"chord":"C","beats":4,"function":"IV"},{"chord":"G","beats":4,"function":"I"}]]}],"bassTab":{"Verse":{"G":"|-3--3-3--3--|","D":"|------------|","A":"|--0--0-0----|","E":"|------------|","description":"Root notes, quarter note feel"},"Chorus":{"G":"|-3--3-3--3--|","D":"|-0--0-0--0--|","A":"|------------|","E":"|------------|","description":"Drive with eighth notes"}},"bassNotes":{"feel":"groove description","rootNotes":"fretboard guidance","dynamics":"dynamics guidance","tips":["tip 1","tip 2","tip 3"]}}`;
 }
-
 // ── AI chart fetch ───────────────────────────────────────────────────────────
 async function fetchChart(title, artist, instrumentId = 'bass', songKey = '') {
   const resp = await fetch('/api/chat', {
@@ -180,26 +304,22 @@ async function fetchChart(title, artist, instrumentId = 'bass', songKey = '') {
   const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
   return { ...parsed, instrumentId };
 }
-
 // ── Planning Center API ──────────────────────────────────────────────────────
 function getSelectedUser() {
   try { const s = localStorage.getItem('selah-user'); if (s) return JSON.parse(s); } catch {}
   return null;
 }
-
 async function pcoGet(action, params = {}) {
   const query = new URLSearchParams({ action, ...params }).toString();
   const resp = await fetch(`/api/planning-center?${query}`);
   if (!resp.ok) throw new Error(`PCO error ${resp.status}`);
   return resp.json();
 }
-
 function formatDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
-
 const SUGGESTIONS = [
   { title: 'Way Maker', artist: 'Sinach' },
   { title: 'Goodness of God', artist: 'Bethel Music' },
@@ -210,7 +330,6 @@ const SUGGESTIONS = [
   { title: 'Battle Belongs', artist: 'Phil Wickham' },
   { title: 'Reckless Love', artist: 'Cory Asbury' },
 ];
-
 // ── CSS ──────────────────────────────────────────────────────────────────────
 function getStyles(theme) {
   const isDark = theme === 'dark';
@@ -527,7 +646,6 @@ html, body, #root { height: 100%; background: var(--bg); color: var(--text); fon
 .inline-pdf-fallback a { color: var(--purple); font-size: 12px; text-decoration: none; }
 `;
 }
-
 // ── Tap Tempo Hook ───────────────────────────────────────────────────────────
 function useTapTempo(onBpmChange) {
   const tapsRef = useRef([]);
@@ -547,7 +665,6 @@ function useTapTempo(onBpmChange) {
   }, [onBpmChange]);
   return tap;
 }
-
 // ── Chart Content ────────────────────────────────────────────────────────────
 function ChartContent({ data, transpose, onTransposeChange, showTransport, instrument }) {
   const inst = instrument || getInstrument(data?.instrumentId || 'bass');
@@ -559,7 +676,6 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport, instr
   const allRef = useRef([]);
   const handleBpmChange = useCallback((v) => setBpm(v), []);
   const tapTempo = useTapTempo(handleBpmChange);
-
   useEffect(() => {
     if (!data) return;
     const flat = [];
@@ -575,7 +691,6 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport, instr
     setIsPlaying(false);
     setCurIdx(0);
   }, [data]);
-
   useEffect(() => {
     if (isPlaying && data) {
       const iv = setInterval(() => setCurIdx(p => (p + 1) % Math.max(allRef.current.length, 1)), (60000 / bpm) * 4);
@@ -584,7 +699,6 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport, instr
     }
     clearInterval(playRef.current);
   }, [isPlaying, bpm, data]);
-
   if (!data) return null;
   const tc = c => transposeChord(c, transpose);
   const tKey = transposeKey(data.key || '', transpose);
@@ -594,7 +708,6 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport, instr
   const isKeys = inst.id === 'keys';
   const tabLabel = inst.tabLabel || 'Tab';
   const showTab = !isDrums && !isVocals;
-
   return (
     <>
       <div className="pills-row">
@@ -698,7 +811,6 @@ function ChartContent({ data, transpose, onTransposeChange, showTransport, instr
     </>
   );
 }
-
 // ── Instrument Picker ────────────────────────────────────────────────────────
 function InstrumentPicker({ current, onSelect, onClose }) {
   return (
@@ -720,7 +832,6 @@ function InstrumentPicker({ current, onSelect, onClose }) {
     </div>
   );
 }
-
 // ── Onboarding ───────────────────────────────────────────────────────────────
 function Onboarding({ onSelect }) {
   return (
@@ -743,30 +854,24 @@ function Onboarding({ onSelect }) {
     </div>
   );
 }
-
 // ── Capo Calculator View ─────────────────────────────────────────────────────
 function CapoView() {
   const [songKey, setSongKey] = useState('C');
   const [capoFret, setCapoFret] = useState(0);
   const [findMode, setFindMode] = useState('result');
-
   const friendlyKeys = ['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
   const easyKeys = ['C','D','E','G','A'];
-
   const soundingKeyActual = CHROMATIC[(CHROMATIC.indexOf(normalizeNote(songKey)) + capoFret) % 12];
-
   const capoOptions = easyKeys.map(openKey => {
     const st = semitonesBetween(openKey, songKey);
     return { openKey, capo: st, sounding: songKey };
   }).filter(o => o.capo >= 0 && o.capo <= 7);
-
   return (
     <div className="capo-view">
       <div style={{ marginBottom:16 }}>
         <div style={{ fontSize:18, fontWeight:700, color:'var(--text)', marginBottom:4 }}>Capo Calculator</div>
         <div style={{ fontSize:13, color:'var(--text2)' }}>Find the right capo position for any key.</div>
       </div>
-
       <div style={{ display:'flex', gap:6, marginBottom:16 }}>
         <button onClick={() => setFindMode('result')} style={{ flex:1, padding:'8px', borderRadius:'var(--radius-sm)', border:`1px solid ${findMode==='result' ? 'var(--accent)' : 'var(--border)'}`, background: findMode==='result' ? 'var(--accent-bg)' : 'var(--bg3)', color: findMode==='result' ? 'var(--accent)' : 'var(--text2)', fontFamily:'var(--font)', fontSize:12, fontWeight:500, cursor:'pointer' }}>
           Key → Sounding key
@@ -775,7 +880,6 @@ function CapoView() {
           Song key → Capo options
         </button>
       </div>
-
       {findMode === 'result' && (
         <div className="capo-section">
           <div className="capo-section-title">What key am I playing in?</div>
@@ -800,7 +904,6 @@ function CapoView() {
           </div>
         </div>
       )}
-
       {findMode === 'find' && (
         <div className="capo-section">
           <div className="capo-section-title">Song key capo options</div>
@@ -833,7 +936,6 @@ function CapoView() {
           )}
         </div>
       )}
-
       <div className="capo-section">
         <div className="capo-section-title">Quick reference</div>
         <div className="capo-card">
@@ -851,7 +953,6 @@ function CapoView() {
     </div>
   );
 }
-
 // ── Stage Mode ───────────────────────────────────────────────────────────────
 function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
   const inst = getInstrument(instrument);
@@ -861,16 +962,17 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
   // pdfUrls stores: { songTitle: { directUrl, blobUrl, status } }
   // status: 'loading' | 'ready' | 'fallback' | 'none'
   const [pdfUrls, setPdfUrls] = useState({});
+  // chordCharts stores parsed PCO chord chart sections per song title
+  // shape: { [title]: { sections: [], rawText: '', status: 'loading'|'ready'|'empty'|'error' } }
+  const [chordCharts, setChordCharts] = useState({});
   const touchStartX = useRef(null);
   const [dragX, setDragX] = useState(0);
   const isDragging = useRef(false);
-
   const total = songs.length;
   const cur = songs[idx];
   const st = tps[idx] || 0;
   const tKey = cur?.data ? transposeKey(cur.data.key || '', st) : '';
   const isDrums = inst.id === 'drums';
-
   // Pre-fetch all PDF URLs on mount, then proxy them for inline rendering
   useEffect(() => {
     songs.forEach(song => {
@@ -899,7 +1001,27 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
       });
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
+  // Pre-fetch PCO arrangement chord_chart text and parse into sections
+  useEffect(() => {
+    songs.forEach(song => {
+      if (song.songId && song.arrangementId) {
+        setChordCharts(p => ({ ...p, [song.title]: { sections: [], rawText: '', status: 'loading' } }));
+        pcoGet('arrangement', { songId: song.songId, arrangementId: song.arrangementId })
+          .then(data => {
+            const attrs = data?.data?.attributes || {};
+            const text = attrs.chord_chart || '';
+            const sections = parsePcoChordChart(text);
+            setChordCharts(p => ({
+              ...p,
+              [song.title]: { sections, rawText: text, status: sections.length ? 'ready' : 'empty' }
+            }));
+          })
+          .catch(() => {
+            setChordCharts(p => ({ ...p, [song.title]: { sections: [], rawText: '', status: 'error' } }));
+          });
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   function goTo(i) { if (i >= 0 && i < total) { setIdx(i); setDragX(0); } }
   function onTouchStart(e) { touchStartX.current = e.touches[0].clientX; isDragging.current = true; }
   function onTouchMove(e) { if (!isDragging.current) return; setDragX(e.touches[0].clientX - touchStartX.current); }
@@ -909,12 +1031,10 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
     else if (dragX > 60 && idx > 0) goTo(idx - 1);
     else setDragX(0);
   }
-
   const trackStyle = {
     transform: `translateX(calc(${-idx * 100}% + ${dragX}px))`,
     transition: isDragging.current ? 'none' : 'transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94)',
   };
-
   return (
     <div className="stage-overlay">
       <div className="stage-topbar">
@@ -934,9 +1054,10 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
             const s = tps[si] || 0;
             const sKey = song.data ? transposeKey(song.data.key || '', s) : '';
             const sTab = tabs[si] || 'chart';
-            const showTab = !isDrums && inst.id !== 'vocals';
             const note = songNotes?.[song.title] || '';
             const pdf = pdfUrls[song.title] || {};
+            const cc = chordCharts[song.title];
+            const songKeyForChart = song.data?.key || song.pcoKey || '';
             return (
               <div key={si} className="stage-panel">
                 <div className="stage-song-title">{song.title}</div>
@@ -961,18 +1082,69 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
                       {s !== 0 && <button className="stage-t-reset" onClick={() => setTps(p => { const n=[...p]; n[si]=0; return n; })}>reset</button>}
                     </div>
                     <div className="stage-tabs">
-                      {song.itemId && <button className={`stage-tab${sTab==='chart'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='chart'; return n; })}>📄 Chart</button>}
+                      <button className={`stage-tab${sTab==='chart'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='chart'; return n; })}>Chord Chart</button>
                       <button className={`stage-tab${sTab==='numbers'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='numbers'; return n; })}>Numbers</button>
+                      {song.itemId && <button className={`stage-tab${sTab==='pdf'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='pdf'; return n; })}>PDF</button>}
                       <button className={`stage-tab${sTab==='notes'?' active':''}`} onClick={() => setTabs(p => { const n=[...p]; n[si]='notes'; return n; })}>Notes</button>
                     </div>
-
-                    {/* ── INLINE PDF CHART TAB ── */}
-                    {sTab === 'chart' && song.itemId && (
+                    {/* ── Chord Chart tab (from PCO text) ── */}
+                    {sTab === 'chart' && (() => {
+                      if (!cc || cc.status === 'loading') {
+                        return (
+                          <div style={{ textAlign:'center', padding:'30px 0' }}>
+                            <div className="loading-spinner" />
+                            <div style={{ fontSize:13, color:'var(--text3)' }}>Loading chord chart from PCO…</div>
+                          </div>
+                        );
+                      }
+                      if (!cc.sections?.length) {
+                        return (
+                          <div>
+                            <div style={{ textAlign:'center', padding:'20px 0', color:'var(--text3)', fontSize:13 }}>
+                              {cc.status === 'error' ? 'Could not load chord chart.' : 'No chord chart text in PCO for this song.'}
+                            </div>
+                            {pdf.directUrl && (
+                              <div className="inline-pdf-fallback" style={{ textAlign:'center' }}>
+                                <a href={pdf.directUrl} target="_blank" rel="noopener noreferrer" style={{ color:'var(--purple)' }}>
+                                  Open PDF chart ↗
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      return <SectionedChart sections={cc.sections} songKey={songKeyForChart} transpose={s} asNumbers={false} />;
+                    })()}
+                    {/* ── Nashville Numbers tab ── */}
+                    {sTab === 'numbers' && (() => {
+                      if (!cc || cc.status === 'loading') {
+                        return (
+                          <div style={{ textAlign:'center', padding:'30px 0' }}>
+                            <div className="loading-spinner" />
+                            <div style={{ fontSize:13, color:'var(--text3)' }}>Loading chord chart from PCO…</div>
+                          </div>
+                        );
+                      }
+                      if (!cc.sections?.length) {
+                        // Soft fallback: AI chord list, if we have one
+                        if (song.data?.chordList?.length) {
+                          return <ChordReferencePanel data={song.data} transpose={s} />;
+                        }
+                        return (
+                          <div style={{ textAlign:'center', padding:'20px 0', color:'var(--text3)', fontSize:13 }}>
+                            No chord chart text in PCO to convert.
+                          </div>
+                        );
+                      }
+                      return <SectionedChart sections={cc.sections} songKey={songKeyForChart} transpose={s} asNumbers={true} />;
+                    })()}
+                    {/* ── PDF tab (fallback / full-info view) ── */}
+                    {sTab === 'pdf' && song.itemId && (
                       <div>
                         {pdf.status === 'loading' && (
                           <div style={{ textAlign:'center', padding:'30px 0' }}>
                             <div className="loading-spinner" />
-                            <div style={{ fontSize:13, color:'var(--text3)' }}>Loading chord chart…</div>
+                            <div style={{ fontSize:13, color:'var(--text3)' }}>Loading PDF…</div>
                           </div>
                         )}
                         {pdf.status === 'none' && (
@@ -992,7 +1164,7 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
                         )}
                         {pdf.status === 'fallback' && pdf.directUrl && (
                           <div style={{ textAlign:'center', padding:'30px 0' }}>
-                            <div style={{ fontSize:14, color:'var(--text2)', marginBottom:16 }}>Chord chart ready</div>
+                            <div style={{ fontSize:14, color:'var(--text2)', marginBottom:16 }}>PDF ready</div>
                             <a href={pdf.directUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none' }}>
                               <button style={{ padding:'16px 32px', background:'var(--purple)', color:'#0f0f0f', fontFamily:'var(--font)', fontSize:16, fontWeight:700, border:'none', borderRadius:'var(--radius)', cursor:'pointer' }}>Open Chord Chart ↗</button>
                             </a>
@@ -1000,35 +1172,6 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
                           </div>
                         )}
                       </div>
-                    )}
-
-                    {sTab === 'numbers' && song.data?.chordList?.length > 0 && (
-                      <ChordReferencePanel data={song.data} transpose={s} />
-                    )}
-                    {sTab === 'tab' && showTab && (
-                      inst.id === 'keys' ? (
-                        !song.data.bassTab ? <div style={{ color:'var(--text3)', fontSize:14 }}>No voicing data.</div> :
-                        Object.entries(song.data.bassTab).map(([sn, d]) => (
-                          <div key={sn} className="voicing-block">
-                            <div className="voicing-section">{sn}</div>
-                            {d.voicing && <div className="voicing-row"><span className="voicing-label">Voicing</span><span className="voicing-val">{d.voicing}</span></div>}
-                            {d.leftHand && <div className="voicing-row"><span className="voicing-label">Left hand</span><span className="voicing-val">{d.leftHand}</span></div>}
-                            {d.rightHand && <div className="voicing-row"><span className="voicing-label">Right hand</span><span className="voicing-val">{d.rightHand}</span></div>}
-                            {d.description && <div className="voicing-desc">{d.description}</div>}
-                          </div>
-                        ))
-                      ) : (
-                        !song.data.bassTab ? <div style={{ color:'var(--text3)', fontSize:14 }}>No tab available.</div> :
-                        Object.entries(song.data.bassTab).map(([sn, d]) => (
-                          <div key={sn} className="tab-section-block">
-                            <div className="tab-section-name">{sn}</div>
-                            <div className="tab-staff">
-                              {['G','D','A','E'].map(s2 => <div key={s2} className="tab-row"><span className="string-label">{s2}</span><span className="string-notes">{d[s2] || '|------------|'}</span></div>)}
-                              {d.description && <div className="tab-desc">{d.description}</div>}
-                            </div>
-                          </div>
-                        ))
-                      )
                     )}
                     {sTab === 'notes' && (
                       <>
@@ -1068,7 +1211,6 @@ function StageMode({ setlistName, songs, instrument, onExit, songNotes }) {
     </div>
   );
 }
-
 // ── PDF Viewer ───────────────────────────────────────────────────────────────
 function PDFViewer({ song, url, onClose }) {
   return (
@@ -1097,12 +1239,10 @@ function PDFViewer({ song, url, onClose }) {
     </div>
   );
 }
-
 // ── Services View ────────────────────────────────────────────────────────────
 function TeamPicker({ onSelect }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
   const TEAM = [
     { first: 'Tim', last: 'Tarrant' },
     { first: 'Abigail', last: 'Navolt' },
@@ -1121,7 +1261,6 @@ function TeamPicker({ onSelect }) {
     { first: 'Josiah', last: 'Tiner' },
     { first: 'Rena', last: 'Tarrant' },
   ];
-
   async function pick(member) {
     setLoading(true); setError('');
     try {
@@ -1133,7 +1272,6 @@ function TeamPicker({ onSelect }) {
     } catch { setError('Connection error. Try again.'); }
     finally { setLoading(false); }
   }
-
   return (
     <div style={{ padding:'20px 16px' }}>
       <div style={{ textAlign:'center', marginBottom:20 }}>
@@ -1179,7 +1317,6 @@ function ServicesView({ onAddToSetlist }) {
       }
     } catch {}
   }, []);
-
   async function syncPlans() {
     setSyncing(true); setError('');
     try {
@@ -1207,7 +1344,6 @@ function ServicesView({ onAddToSetlist }) {
     } catch (e) { setError('Could not connect to Planning Center. ' + e.message); }
     finally { setSyncing(false); }
   }
-
   async function loadPlanSongs(plan) {
     const key = plan.id;
     if (planSongs[key] || loadingSongs[key]) return;
@@ -1230,7 +1366,6 @@ function ServicesView({ onAddToSetlist }) {
     } catch { setError('Could not load songs for this service.'); }
     finally { setLoadingSongs(p => ({ ...p, [key]: false })); }
   }
-
   async function openPDF(song) {
     setPdfViewer({ song, url: null });
     try {
@@ -1253,18 +1388,16 @@ function ServicesView({ onAddToSetlist }) {
       } else { setPdfViewer({ song, url: 'none' }); }
     } catch { setPdfViewer({ song, url: 'error' }); }
   }
-
   function togglePlan(plan) {
     if (expandedPlan === plan.id) { setExpandedPlan(null); } else { setExpandedPlan(plan.id); loadPlanSongs(plan); }
   }
-
   const getDateParts = (dateStr) => {
     if (!dateStr) return { day: '?', month: '???', full: '' };
     const d = new Date(dateStr);
     return { day: d.getDate(), month: d.toLocaleString('en-US', { month: 'short' }).toUpperCase(), full: formatDate(dateStr) };
   };
   if (!hasUser) return <TeamPicker onSelect={() => setHasUser(true)} />;
-  
+
   return (
     <div className="pco-view">
       <div className="pco-header">
@@ -1325,7 +1458,6 @@ function ServicesView({ onAddToSetlist }) {
     </div>
   );
 }
-
 // ── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('selah-theme') || 'dark'; } catch { return 'dark'; } });
@@ -1357,7 +1489,6 @@ export default function App() {
   const touchStartY = useRef(0);
   const [touchDragActive, setTouchDragActive] = useState(false);
   const [touchOverIdx, setTouchOverIdx] = useState(null);
-
   useEffect(() => { const t = setTimeout(() => setShowSplash(false), 2400); return () => clearTimeout(t); }, []);
   useEffect(() => { try { localStorage.setItem('selah-theme', theme); } catch {} }, [theme]);
   useEffect(() => { try { localStorage.setItem('selah-instrument', instrument || ''); } catch {} }, [instrument]);
@@ -1366,17 +1497,13 @@ export default function App() {
   useEffect(() => { try { localStorage.setItem('bass-active-setlist', JSON.stringify(setlistSongs)); } catch {} }, [setlistSongs]);
   useEffect(() => { try { localStorage.setItem('bass-active-setlist-name', setlistName); } catch {} }, [setlistName]);
   useEffect(() => { try { localStorage.setItem('selah-song-notes', JSON.stringify(songNotes)); } catch {} }, [songNotes]);
-
   const inst = getInstrument(instrument || 'bass');
   const isInLibrary = songData ? library.some(s => s.title === songData.title && s.artist === songData.artist) : false;
-
   function toggleTheme() { setTheme(t => t === 'dark' ? 'light' : 'dark'); }
   function selectInstrument(id) { setInstrument(id); setSongData(null); }
-
   function updateSongNote(title, note) {
     setSongNotes(p => ({ ...p, [title]: note }));
   }
-
   async function doSearch(title, artist) {
     if (!title.trim()) return;
     setLoading(true); setError(''); setSongData(null); setTranspose(0);
@@ -1384,7 +1511,6 @@ export default function App() {
     catch { setError("Couldn't load that song. Try being more specific or check your connection."); }
     finally { setLoading(false); }
   }
-
   function quickSearch(s) { setSongTitle(s.title); setSongArtist(s.artist); doSearch(s.title, s.artist); }
   function saveToLibrary() { if (!songData || isInLibrary) return; setLibrary(p => [{ ...songData, savedAt: Date.now() }, ...p]); }
   function removeFromLibrary(title, artist) { setLibrary(p => p.filter(s => !(s.title === title && s.artist === artist))); }
@@ -1393,7 +1519,6 @@ export default function App() {
     setSetlistSongs(p => { if (p.some(s => s.title === song.title && s.artist === song.artist)) return p; return [...p, { title: song.title, artist: song.artist, status: 'loaded', data: song }]; });
     setView('setlist');
   }
-
   function addToSetlistFromPCO(pcoSong, planName) {
     if (planName) setSetlistName(planName);
     setSetlistSongs(p => {
@@ -1407,15 +1532,12 @@ export default function App() {
     });
     setView('setlist');
   }
-
   function addToSetlist() {
     if (!addTitle.trim()) return;
     setSetlistSongs(p => [...p, { title: addTitle.trim(), artist: addArtist.trim(), status: 'pending', data: null }]);
     setAddTitle(''); setAddArtist('');
   }
-
   function removeSong(i) { setSetlistSongs(p => p.filter((_, x) => x !== i)); }
-
   async function loadSongAt(i) {
     const song = setlistSongs[i];
     if (!song || song.status === 'loaded' || song.status === 'loading') return;
@@ -1428,9 +1550,7 @@ export default function App() {
       setSetlistSongs(p => { const n=[...p]; n[i]={...n[i], status:'loaded', data}; return n; });
     } catch { setSetlistSongs(p => { const n=[...p]; n[i]={...n[i], status:'error'}; return n; }); }
   }
-
   async function loadAll() { for (let i = 0; i < setlistSongs.length; i++) { if (setlistSongs[i].status === 'pending' || setlistSongs[i].status === 'error') await loadSongAt(i); } }
-
   function saveSetlist() {
     if (!setlistSongs.length) return;
     const existing = savedSetlists.findIndex(s => s.name === setlistName);
@@ -1438,16 +1558,13 @@ export default function App() {
     if (existing >= 0) { setSavedSetlists(p => { const n=[...p]; n[existing]=sl; return n; }); }
     else { setSavedSetlists(p => [sl, ...p]); }
   }
-
   function loadSaved(sl) { setSetlistName(sl.name); setSetlistSongs(sl.songs.map(s => ({ ...s, status:s.data?'loaded':'pending' }))); setView('setlist'); }
-
   function newSetlist() {
     const today = new Date(); const day = today.getDay(); const daysUntilSunday = day === 0 ? 7 : 7 - day;
     const nextSunday = new Date(today); nextSunday.setDate(today.getDate() + daysUntilSunday);
     setSetlistName(nextSunday.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' Sunday');
     setSetlistSongs([]); setView('setlist');
   }
-
   function onDragStart(i) { dragIdx.current = i; setDraggingIdx(i); }
   function onDragOver(e, i) { e.preventDefault(); dragOverIdx.current = i; setDragOverVisual(i); }
   function onDragEnd() { setDraggingIdx(null); setDragOverVisual(null); }
@@ -1469,15 +1586,12 @@ export default function App() {
     }
     touchDragIdx.current = null; setTouchDragActive(false); setTouchOverIdx(null);
   }
-
   const allLoaded = setlistSongs.length > 0 && setlistSongs.every(s => s.status === 'loaded');
   const anyLoading = setlistSongs.some(s => s.status === 'loading');
   const loadedCount = setlistSongs.filter(s => s.status === 'loaded').length;
-
   if (!instrument && !showSplash) {
     return (<><style>{getStyles(theme)}</style><Onboarding onSelect={selectInstrument} /></>);
   }
-
   return (
     <>
       <style>{getStyles(theme)}</style>
@@ -1492,7 +1606,6 @@ export default function App() {
       )}
       {showInstPicker && <InstrumentPicker current={instrument} onSelect={selectInstrument} onClose={() => setShowInstPicker(false)} />}
       {stageOpen && <StageMode setlistName={setlistName} songs={setlistSongs} instrument={instrument} onExit={() => setStageOpen(false)} songNotes={songNotes} />}
-
       <div className="app">
         <div className="nav-bar">
           <div className="nav-logo" onClick={() => setShowInstPicker(true)}>
@@ -1515,10 +1628,8 @@ export default function App() {
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
         </div>
-
         {view === 'services' && <ServicesView onAddToSetlist={addToSetlistFromPCO} />}
         {view === 'capo' && <CapoView />}
-
         {view === 'search' && (
           <>
             <div className="search-section">
@@ -1564,7 +1675,6 @@ export default function App() {
             )}
           </>
         )}
-
         {view === 'library' && (
           <div className="library-view">
             <div className="library-label">My song library ({library.length})</div>
@@ -1589,7 +1699,6 @@ export default function App() {
             )}
           </div>
         )}
-
         {view === 'setlist' && (
           <div className="setlist-view">
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
@@ -1683,7 +1792,6 @@ export default function App() {
             )}
           </div>
         )}
-
         <div style={{ borderTop:'1px solid var(--border)', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
           <div style={{ width:16, height:16, background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--text3)"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 3a1 1 0 0 1 1 1v6.17A3 3 0 1 1 9 16V7a1 1 0 0 1 1-1h2zm-2 11a1 1 0 1 0 2 0 1 1 0 0 0-2 0z"/></svg>
